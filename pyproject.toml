@@ -35,6 +35,8 @@ select = ["E", "F", "W", "I", "B", "UP", "N", "S", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101"]
+# PySpark convention: `from pyspark.sql import functions as F`
+"databricks/**" = ["N812"]
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers --import-mode=importlib"
