@@ -6,10 +6,12 @@ import argparse
 import asyncio
 import logging
 import signal
+import threading
 import time
 from pathlib import Path
 
 from crypto_recon_common.config import load_products_config
+from crypto_recon_common.volume import VolumeUploader, connect_files_client, upload_continuously
 from crypto_recon_producer.batching import Batcher
 from crypto_recon_producer.client import COINBASE_WS_URL, Producer
 
@@ -27,6 +29,17 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=None,
         help="Stop after this many seconds (a capture window). Default: run until stopped.",
     )
+    parser.add_argument(
+        "--volume-path",
+        default=None,
+        help="Upload flushed files to this Volume path. Default: keep files local.",
+    )
+    parser.add_argument(
+        "--databricks-profile",
+        default=None,
+        help="Databricks CLI profile. Default: DATABRICKS_HOST/DATABRICKS_TOKEN or DEFAULT.",
+    )
+    parser.add_argument("--upload-interval-seconds", type=float, default=5.0)
     parser.add_argument("--log-level", default="INFO")
     return parser.parse_args(argv)
 
@@ -51,7 +64,26 @@ async def _run(args: argparse.Namespace) -> None:
     if args.duration_seconds is not None:
         loop.call_later(args.duration_seconds, stop.set)
 
-    await producer.run(stop)
+    upload_stop = threading.Event()
+    uploader_thread: threading.Thread | None = None
+    if args.volume_path is not None:
+        uploader = VolumeUploader(
+            connect_files_client(args.databricks_profile), args.output_dir, args.volume_path
+        )
+        uploader_thread = threading.Thread(
+            target=upload_continuously,
+            args=(uploader, upload_stop, args.upload_interval_seconds),
+            name="volume-uploader",
+            daemon=True,
+        )
+        uploader_thread.start()
+
+    try:
+        await producer.run(stop)
+    finally:
+        if uploader_thread is not None:
+            upload_stop.set()  # the uploader does one final sweep after the last flush
+            await asyncio.to_thread(uploader_thread.join, 120)
 
 
 def main(argv: list[str] | None = None) -> int:

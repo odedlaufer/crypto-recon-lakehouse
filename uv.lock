@@ -188,12 +188,14 @@ name = "crypto-recon-common"
 version = "0.1.0"
 source = { editable = "libs/common" }
 dependencies = [
+    { name = "databricks-sdk" },
     { name = "pydantic" },
     { name = "pyyaml" },
 ]
 
 [package.metadata]
 requires-dist = [
+    { name = "databricks-sdk", specifier = ">=0.117.0" },
     { name = "pydantic", specifier = ">=2.12.5" },
     { name = "pyyaml", specifier = ">=6.0.3" },
 ]
