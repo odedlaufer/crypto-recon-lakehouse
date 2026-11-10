@@ -1,0 +1,23 @@
+bundle:
+  name: crypto-recon-lakehouse
+
+variables:
+  catalog:
+    description: Unity Catalog catalog for this target
+
+workspace:
+  host: https://dbc-c6f5458b-d402.cloud.databricks.com
+
+targets:
+  dev:
+    mode: development
+    default: true
+    variables:
+      catalog: crypto_dev
+
+  prd:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/odedlaufer1@gmail.com/.bundle/${bundle.name}/${bundle.target}
+    variables:
+      catalog: crypto_prd
