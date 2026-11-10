@@ -9,7 +9,7 @@ help: ## Show available targets
 # pre-commit refuses to install when a global core.hooksPath is set,
 # so the install runs with the global git config hidden.
 setup: ## Install Python deps (dev + dbt) and git hooks
-	uv sync --group dbt
+	uv sync --all-packages --group dbt
 	GIT_CONFIG_GLOBAL=/dev/null uv run pre-commit install
 
 lint: ## Run all pre-commit hooks on every file
