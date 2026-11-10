@@ -1,0 +1,17 @@
+[project]
+name = "crypto-recon-lakehouse"
+version = "0.1.0"
+description = "Crypto market data lakehouse: stream vs batch reconciliation with self-healing gaps"
+requires-python = "==3.12.*"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.7.0",
+    "pytest>=9.2.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.4",
+]
