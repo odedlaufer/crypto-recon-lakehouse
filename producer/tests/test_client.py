@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import json
 from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from websockets.asyncio.server import ServerConnection, serve
@@ -113,3 +114,38 @@ async def _run_against_local_server(tmp_path: Path) -> None:
     assert trade_ids == [10, 11]
     assert len(_files(tmp_path, "heartbeat")) == 1
     assert len(_files(tmp_path, "_rejected")) == 1
+
+
+class FakeClock:
+    def __init__(self, start: datetime) -> None:
+        self.now = start
+
+    def __call__(self) -> datetime:
+        return self.now
+
+    def advance(self, seconds: float) -> None:
+        self.now += timedelta(seconds=seconds)
+
+
+def test_tick_reports_heartbeat_gap_and_writes_metrics(tmp_path: Path) -> None:
+    clock = FakeClock(datetime(2026, 11, 10, 12, 0, 0, 500000, tzinfo=UTC))
+    batcher = Batcher(tmp_path)
+    producer = Producer(["BTC-USD"], batcher, clock=clock, metrics_interval=timedelta(seconds=30))
+
+    producer.handle_raw(json.dumps(MATCH))  # trade 10, exchange time 12:00:00.000001
+    producer.handle_raw(json.dumps({**HEARTBEAT, "last_trade_id": 13}))
+    clock.advance(5)
+    producer.handle_raw(json.dumps({**HEARTBEAT, "last_trade_id": 13}))
+    producer.tick()
+    assert producer.stats.trade_gaps == 1
+
+    clock.advance(25)
+    producer.tick()
+    batcher.flush_all()
+
+    [metrics_file] = _files(tmp_path, "_metrics")
+    [record] = [json.loads(line) for line in metrics_file.read_text().splitlines()]
+    assert record["run_id"] == producer.run_id
+    assert (record["messages"], record["landed"], record["trade_gaps"]) == (3, 3, 1)
+    assert record["msgs_per_sec"] == 0.1
+    assert record["latency_p50_ms"] == 499.999
