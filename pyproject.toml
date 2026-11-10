@@ -36,4 +36,7 @@ select = ["E", "F", "W", "I", "B", "UP", "N", "S", "SIM", "RUF"]
 "**/tests/**" = ["S101"]
 
 [tool.pytest.ini_options]
-addopts = "-ra --strict-markers"
+addopts = "-ra --strict-markers --import-mode=importlib"
+
+[tool.ruff.lint.isort]
+known-first-party = ["crypto_recon_*"]

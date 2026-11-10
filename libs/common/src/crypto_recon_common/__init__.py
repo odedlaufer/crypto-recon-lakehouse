@@ -1,2 +1,1 @@
-def hello() -> str:
-    return "Hello from crypto-recon-common!"
+"""Shared code for the crypto recon lakehouse."""
