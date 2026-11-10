@@ -11,6 +11,7 @@ resolution-markers = [
 members = [
     "crypto-recon-common",
     "crypto-recon-lakehouse",
+    "crypto-recon-producer",
 ]
 
 [[package]]
@@ -227,6 +228,17 @@ dev = [
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "ruff", specifier = ">=0.17.4" },
 ]
+
+[[package]]
+name = "crypto-recon-producer"
+version = "0.1.0"
+source = { editable = "producer" }
+dependencies = [
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "pydantic", specifier = ">=2.12.5" }]
 
 [[package]]
 name = "cryptography"

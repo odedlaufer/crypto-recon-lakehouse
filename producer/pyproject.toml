@@ -1,0 +1,15 @@
+[project]
+name = "crypto-recon-producer"
+version = "0.1.0"
+description = "Coinbase WebSocket producer: subscribe, validate, batch and upload to the landing Volume"
+authors = [
+    { name = "Oded Laufer", email = "odedlaufer1@gmail.com" }
+]
+requires-python = "==3.12.*"
+dependencies = [
+    "pydantic>=2.12.5",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"

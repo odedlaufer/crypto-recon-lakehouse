@@ -11,6 +11,7 @@ package = false
 [tool.uv.workspace]
 members = [
     "libs/common",
+    "producer",
 ]
 
 [dependency-groups]
