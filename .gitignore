@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Secrets
+.env
+*.pem
+
+# dbt
+dbt/target/
+dbt/dbt_packages/
+dbt/logs/
+dbt/.user.yml
+
+# Databricks
+.databricks/
+
+# Local data
+data/
+*.jsonl
+
+# OS / editor
+.DS_Store
+.vscode/settings.json
