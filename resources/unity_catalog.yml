@@ -1,0 +1,38 @@
+resources:
+  schemas:
+    raw:
+      name: raw
+      catalog_name: ${var.catalog}
+      comment: Landing zone for raw files from the producer and REST fetchers
+    bronze:
+      name: bronze
+      catalog_name: ${var.catalog}
+      comment: Raw ingested records, one row per source message or response row
+    silver:
+      name: silver
+      catalog_name: ${var.catalog}
+      comment: Parsed, typed, deduplicated entities
+    gold:
+      name: gold
+      catalog_name: ${var.catalog}
+      comment: Stream-built 1-minute candles
+    marts:
+      name: marts
+      catalog_name: ${var.catalog}
+      comment: dbt reconciliation and analytics marts
+    ops:
+      name: ops
+      catalog_name: ${var.catalog}
+      comment: Run metrics, gaps, DQ results, producer metrics
+    quarantine:
+      name: quarantine
+      catalog_name: ${var.catalog}
+      comment: Rows rejected by data-quality rules
+
+  volumes:
+    landing:
+      name: landing
+      catalog_name: ${var.catalog}
+      schema_name: ${resources.schemas.raw.name}
+      volume_type: MANAGED
+      comment: Raw JSONL and REST files, partitioned by source/channel/dt/hr

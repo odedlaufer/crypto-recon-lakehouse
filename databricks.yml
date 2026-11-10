@@ -1,6 +1,9 @@
 bundle:
   name: crypto-recon-lakehouse
 
+include:
+  - resources/*.yml
+
 variables:
   catalog:
     description: Unity Catalog catalog for this target
@@ -10,8 +13,12 @@ workspace:
 
 targets:
   dev:
-    mode: development
+    # No `mode: development`: it prefixes UC schemas with dev_<user>_,
+    # which is redundant with one catalog per environment (ADR-006).
     default: true
+    presets:
+      pipelines_development: true
+      trigger_pause_status: PAUSED
     variables:
       catalog: crypto_dev
 
