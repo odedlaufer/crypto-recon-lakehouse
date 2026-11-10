@@ -41,15 +41,27 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     )
     parser.add_argument("--upload-interval-seconds", type=float, default=5.0)
     parser.add_argument("--log-level", default="INFO")
+    parser.add_argument(
+        "--log-file",
+        type=Path,
+        default=None,
+        help="Also append logs to this file (survives Ctrl+C, unlike piping to tee).",
+    )
     return parser.parse_args(argv)
 
 
-def _configure_logging(level: str) -> None:
+def _configure_logging(level: str, log_file: Path | None = None) -> None:
     logging.Formatter.converter = time.gmtime
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    if log_file is not None:
+        log_file.parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
     logging.basicConfig(
         level=level.upper(),
         format="%(asctime)s.%(msecs)03dZ %(levelname)s %(name)s: %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S",
+        handlers=handlers,
+        force=True,
     )
 
 
@@ -88,7 +100,7 @@ async def _run(args: argparse.Namespace) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    _configure_logging(args.log_level)
+    _configure_logging(args.log_level, args.log_file)
     asyncio.run(_run(args))
     return 0
 
