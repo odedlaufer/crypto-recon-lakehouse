@@ -1,0 +1,14 @@
+resources:
+  pipelines:
+    stream:
+      name: crypto-recon-stream-${bundle.target}
+      catalog: ${var.catalog}
+      schema: bronze
+      serverless: true
+      continuous: false
+      root_path: ../databricks/pipelines/stream
+      libraries:
+        - glob:
+            include: ../databricks/pipelines/stream/transformations/**
+      configuration:
+        landing_path: /Volumes/${var.catalog}/raw/landing
