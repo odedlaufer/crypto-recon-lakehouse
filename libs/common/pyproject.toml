@@ -1,0 +1,16 @@
+[project]
+name = "crypto-recon-common"
+version = "0.1.0"
+description = "Shared code for the crypto recon lakehouse: config loading, Volume upload, logging"
+authors = [
+    { name = "Oded Laufer", email = "odedlaufer1@gmail.com" }
+]
+requires-python = "==3.12.*"
+dependencies = [
+    "pydantic>=2.12.5",
+    "pyyaml>=6.0.3",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.7,<0.14.0"]
+build-backend = "uv_build"

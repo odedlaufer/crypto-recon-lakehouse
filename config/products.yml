@@ -1,0 +1,5 @@
+# Products to ingest (FR-P1). Also the silver allow-list (DQ-08).
+products:
+  - BTC-USD
+  - ETH-USD
+  - SOL-USD
