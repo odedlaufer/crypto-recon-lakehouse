@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 TARGET ?= dev
 
-.PHONY: help setup lint test validate deploy dbt-debug run-producer backfill
+.PHONY: help setup lint test validate deploy dbt-debug run-producer docker-build backfill
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -33,3 +33,6 @@ run-producer: ## Run the WebSocket producer, e.g. ARGS="--duration-seconds 60"
 
 backfill: ## Backfill official candles, START= END= (Phase 2)
 	@echo "Not implemented yet (Phase 2)"; exit 1
+
+docker-build: ## Build the producer image (crypto-recon-producer:dev)
+	docker build -f producer/Dockerfile -t crypto-recon-producer:dev .
