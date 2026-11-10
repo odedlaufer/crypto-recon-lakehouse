@@ -28,8 +28,8 @@ deploy: ## Deploy the bundle (TARGET=dev|prd)
 dbt-debug: ## Check the dbt connection (TARGET=dev|prd)
 	cd dbt && uv run --group dbt dbt debug --target $(TARGET)
 
-run-producer: ## Run the WebSocket producer (Phase 1)
-	@echo "Not implemented yet (Phase 1)"; exit 1
+run-producer: ## Run the WebSocket producer, e.g. ARGS="--duration-seconds 60"
+	uv run python -m crypto_recon_producer $(ARGS)
 
 backfill: ## Backfill official candles, START= END= (Phase 2)
 	@echo "Not implemented yet (Phase 2)"; exit 1

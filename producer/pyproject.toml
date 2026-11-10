@@ -7,9 +7,14 @@ authors = [
 ]
 requires-python = "==3.12.*"
 dependencies = [
+    "crypto-recon-common",
     "pydantic>=2.12.5",
+    "websockets>=17.4",
 ]
 
 [build-system]
 requires = ["uv_build>=0.13.7,<0.14.0"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+crypto-recon-common = { workspace = true }
