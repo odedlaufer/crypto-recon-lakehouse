@@ -9,3 +9,4 @@
 | [ADR-005](ADR-005-uv-workspace.md) | uv workspace with a shared `libs/common` package | Accepted |
 | [ADR-006](ADR-006-catalog-per-environment.md) | One Unity Catalog catalog per environment | Accepted |
 | [ADR-007](ADR-007-dbt-core-v1.md) | dbt Core v1 instead of dbt v2 | Accepted |
+| [ADR-008](ADR-008-ci-capture.md) | Capture in GitHub Actions with overlapping windows, PAT auth | Accepted |
