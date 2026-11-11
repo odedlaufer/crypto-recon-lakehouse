@@ -1,0 +1,53 @@
+version: 2
+
+unit_tests:
+  - name: reconciliation_scope_full_refresh
+    description: >-
+      FR-R1 scope: minutes before reconcile_start_date and minutes on days without
+      published official candles are excluded.
+    model: fct_reconciliation_1m
+    overrides:
+      macros:
+        is_incremental: false
+      vars:
+        reconcile_start_date: "2026-11-10"
+    given:
+      - input: ref('stg_candles_official')
+        rows:
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 23:59:00"}
+      - input: ref('int_reconciliation_1m')
+        rows:
+          - {product_id: BTC-USD, minute_ts: "2026-11-09 12:00:00", status: MATCH}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 12:00:00", status: MATCH}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 23:59:00", status: PRICE_MISMATCH}
+          - {product_id: BTC-USD, minute_ts: "2026-11-11 00:00:00", status: MISSING_IN_BATCH}
+    expect:
+      rows:
+        - {product_id: BTC-USD, minute_ts: "2026-11-10 12:00:00", status_before_repair: MATCH, status_after_repair: MATCH}
+        - {product_id: BTC-USD, minute_ts: "2026-11-10 23:59:00", status_before_repair: PRICE_MISMATCH, status_after_repair: PRICE_MISMATCH}
+
+  - name: reconciliation_scope_incremental
+    description: >-
+      Incremental run: a minute already reconciled and outside the lookback is skipped;
+      a never-reconciled old minute (e.g. official candles backfilled later) is included.
+    model: fct_reconciliation_1m
+    overrides:
+      macros:
+        is_incremental: true
+      vars:
+        reconcile_start_date: "2026-11-01"
+        reconcile_lookback_days: 0
+    given:
+      - input: this
+        rows:
+          - {product_id: BTC-USD, minute_ts: "2026-11-05 12:00:00"}
+      - input: ref('stg_candles_official')
+        rows:
+          - {product_id: BTC-USD, minute_ts: "2026-11-05 23:59:00"}
+      - input: ref('int_reconciliation_1m')
+        rows:
+          - {product_id: BTC-USD, minute_ts: "2026-11-05 12:00:00", status: MATCH}
+          - {product_id: BTC-USD, minute_ts: "2026-11-05 12:01:00", status: MISSING_IN_STREAM}
+    expect:
+      rows:
+        - {product_id: BTC-USD, minute_ts: "2026-11-05 12:01:00", status_before_repair: MISSING_IN_STREAM}
