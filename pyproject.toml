@@ -36,8 +36,9 @@ select = ["E", "F", "W", "I", "B", "UP", "N", "S", "SIM", "RUF"]
 
 [tool.ruff.lint.per-file-ignores]
 "**/tests/**" = ["S101"]
-# PySpark convention: `from pyspark.sql import functions as F`
-"databricks/**" = ["N812"]
+# N812: PySpark convention `functions as F`.
+# S608: Databricks SQL is built from validated identifiers and date objects, never free text.
+"databricks/**" = ["N812", "S608"]
 
 [tool.pytest.ini_options]
 addopts = "-ra --strict-markers --import-mode=importlib"

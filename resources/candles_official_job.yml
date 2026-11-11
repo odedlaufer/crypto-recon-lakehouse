@@ -1,0 +1,69 @@
+resources:
+  jobs:
+    candles_official:
+      name: crypto-recon-candles-official-${bundle.target}
+      description: >-
+        Official candles write-audit-publish (FR-J1, PRD 6.2): load bronze, stage the date
+        range, audit DQ-11 to DQ-14, publish to silver.candles_official only if all pass.
+      max_concurrent_runs: 1
+      email_notifications:
+        on_failure:
+          - odedlaufer1@gmail.com
+      parameters:
+        - name: start_date
+          default: ""  # YYYY-MM-DD; empty means yesterday UTC
+        - name: end_date
+          default: ""  # YYYY-MM-DD; empty means start_date
+      environments:
+        - environment_key: default
+          spec:
+            environment_version: "3"
+            dependencies:
+              - pyyaml
+      tasks:
+        - task_key: load_bronze
+          environment_key: default
+          spark_python_task:
+            python_file: ../databricks/jobs/candles_official.py
+            parameters:
+              - --step=load_bronze
+              - --catalog=${var.catalog}
+              - --products-config=${workspace.file_path}/config/products.yml
+
+        - task_key: stage
+          depends_on:
+            - task_key: load_bronze
+          environment_key: default
+          spark_python_task:
+            python_file: ../databricks/jobs/candles_official.py
+            parameters:
+              - --step=stage
+              - --catalog=${var.catalog}
+              - --start={{job.parameters.start_date}}
+              - --end={{job.parameters.end_date}}
+              - --products-config=${workspace.file_path}/config/products.yml
+
+        - task_key: audit
+          depends_on:
+            - task_key: stage
+          environment_key: default
+          spark_python_task:
+            python_file: ../databricks/jobs/candles_official.py
+            parameters:
+              - --step=audit
+              - --catalog=${var.catalog}
+              - --start={{job.parameters.start_date}}
+              - --end={{job.parameters.end_date}}
+              - --products-config=${workspace.file_path}/config/products.yml
+              - --run-id={{job.run_id}}
+
+        - task_key: publish
+          depends_on:
+            - task_key: audit
+          environment_key: default
+          spark_python_task:
+            python_file: ../databricks/jobs/candles_official.py
+            parameters:
+              - --step=publish
+              - --catalog=${var.catalog}
+              - --products-config=${workspace.file_path}/config/products.yml
