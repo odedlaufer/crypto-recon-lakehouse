@@ -29,6 +29,11 @@ resources:
       catalog_name: ${var.catalog}
       comment: Rows rejected by data-quality rules
 
+    staging:
+      name: staging
+      catalog_name: ${var.catalog}
+      comment: dbt staging and intermediate views
+
   volumes:
     landing:
       name: landing

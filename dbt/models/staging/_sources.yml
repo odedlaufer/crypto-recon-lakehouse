@@ -1,0 +1,28 @@
+version: 2
+
+sources:
+  - name: silver
+    description: Parsed, typed, deduplicated entities built by the stream pipeline and batch jobs.
+    schema: silver
+    tables:
+      - name: trades
+        description: One row per Coinbase trade (stream or backfill).
+        config:
+          loaded_at_field: exchange_time
+          freshness:  # FR-D4
+            warn_after: {count: 30, period: minute}
+            error_after: {count: 2, period: hour}
+      - name: candles_official
+        description: Official Coinbase 1-minute candles, published by the write-audit-publish job.
+        config:
+          loaded_at_field: _published_at
+          freshness:  # FR-D4
+            warn_after: {count: 26, period: hour}
+            error_after: {count: 50, period: hour}
+
+  - name: gold
+    description: Stream-built aggregates from the stream pipeline.
+    schema: gold
+    tables:
+      - name: candles_stream_1m
+        description: 1-minute candles built from silver.trades (ADR-009).
