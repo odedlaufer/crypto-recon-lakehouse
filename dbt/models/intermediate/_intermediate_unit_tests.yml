@@ -1,0 +1,39 @@
+version: 2
+
+unit_tests:
+  - name: reconciliation_status_classifier
+    description: FR-R3 statuses and the FR-R5 volume tolerance boundary (0.01%).
+    model: int_reconciliation_1m
+    given:
+      - input: ref('stg_candles_stream')
+        rows:
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:00:00", open: 100, high: 110, low: 90, close: 105, volume: 10.000, trade_count: 5, first_trade_id: 1, last_trade_id: 5}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:01:00", open: 100, high: 110, low: 90, close: 105, volume: 10.001, trade_count: 5, first_trade_id: 6, last_trade_id: 10}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:02:00", open: 100, high: 110, low: 90, close: 105, volume: 10.002, trade_count: 5, first_trade_id: 11, last_trade_id: 15}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:03:00", open: 100, high: 110, low: 90, close: 105, volume: 9.998, trade_count: 5, first_trade_id: 16, last_trade_id: 20}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:04:00", open: 100, high: 110, low: 90, close: 106, volume: 10.000, trade_count: 5, first_trade_id: 21, last_trade_id: 25}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:05:00", open: 100, high: 111, low: 90, close: 105, volume: 12.000, trade_count: 5, first_trade_id: 26, last_trade_id: 30}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:07:00", open: 100, high: 110, low: 90, close: 105, volume: 10.000, trade_count: 5, first_trade_id: 31, last_trade_id: 35}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:08:00", open: 100, high: 110, low: 90, close: 105, volume: 10.000, trade_count: 5, first_trade_id: 36, last_trade_id: 40}
+      - input: ref('stg_candles_official')
+        rows:
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:00:00", open: 100, high: 110, low: 90, close: 105, volume: 10}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:01:00", open: 100, high: 110, low: 90, close: 105, volume: 10}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:02:00", open: 100, high: 110, low: 90, close: 105, volume: 10}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:03:00", open: 100, high: 110, low: 90, close: 105, volume: 10}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:04:00", open: 100, high: 110, low: 90, close: 105, volume: 10}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:05:00", open: 100, high: 110, low: 90, close: 105, volume: 10}
+          - {product_id: BTC-USD, minute_ts: "2026-11-10 00:06:00", open: 100, high: 110, low: 90, close: 105, volume: 10}
+          - {product_id: ETH-USD, minute_ts: "2026-11-10 00:08:00", open: 100, high: 110, low: 90, close: 105, volume: 10}
+    expect:
+      rows:
+        - {product_id: BTC-USD, minute_ts: "2026-11-10 00:00:00", status: MATCH}
+        - {product_id: BTC-USD, minute_ts: "2026-11-10 00:01:00", status: MATCH}
+        - {product_id: BTC-USD, minute_ts: "2026-11-10 00:02:00", status: VOLUME_DRIFT}
+        - {product_id: BTC-USD, minute_ts: "2026-11-10 00:03:00", status: VOLUME_DRIFT}
+        - {product_id: BTC-USD, minute_ts: "2026-11-10 00:04:00", status: PRICE_MISMATCH}
+        - {product_id: BTC-USD, minute_ts: "2026-11-10 00:05:00", status: PRICE_MISMATCH}
+        - {product_id: BTC-USD, minute_ts: "2026-11-10 00:06:00", status: MISSING_IN_STREAM}
+        - {product_id: BTC-USD, minute_ts: "2026-11-10 00:07:00", status: MISSING_IN_BATCH}
+        - {product_id: BTC-USD, minute_ts: "2026-11-10 00:08:00", status: MISSING_IN_BATCH}
+        - {product_id: ETH-USD, minute_ts: "2026-11-10 00:08:00", status: MISSING_IN_STREAM}
