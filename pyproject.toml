@@ -12,6 +12,7 @@ package = false
 members = [
     "libs/common",
     "producer",
+    "fetchers",
 ]
 
 [dependency-groups]

@@ -31,8 +31,9 @@ dbt-debug: ## Check the dbt connection (TARGET=dev|prd)
 run-producer: ## Run the WebSocket producer, e.g. ARGS="--duration-seconds 60"
 	uv run python -m crypto_recon_producer $(ARGS)
 
-backfill: ## Backfill official candles, START= END= (Phase 2)
-	@echo "Not implemented yet (Phase 2)"; exit 1
+backfill: ## Fetch official candles to dev, START=YYYY-MM-DD END=YYYY-MM-DD
+	@test -n "$(START)" -a -n "$(END)" || { echo "usage: make backfill START=YYYY-MM-DD END=YYYY-MM-DD"; exit 1; }
+	uv run python -m crypto_recon_fetchers candles --start $(START) --end $(END) --volume-path /Volumes/crypto_dev/raw/landing $(ARGS)
 
 docker-build: ## Build the producer image (crypto-recon-producer:dev)
 	docker build -f producer/Dockerfile -t crypto-recon-producer:dev .
