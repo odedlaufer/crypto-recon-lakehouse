@@ -1,3 +1,22 @@
 name: crypto_recon
 version: "0.1.0"
 profile: crypto_recon
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+test-paths: ["tests"]
+
+vars:
+  # FR-R1: only minutes older than this are reconciled.
+  settlement_minutes: 15
+  # FR-R3 / FR-R5: MATCH allows a relative volume difference up to this percentage.
+  volume_tolerance_pct: 0.01
+
+models:
+  crypto_recon:
+    +persist_docs:
+      relation: true
+      columns: true
+    staging:
+      +schema: staging
+      +materialized: view

@@ -1,0 +1,56 @@
+version: 2
+
+models:
+  - name: stg_candles_official
+    description: Official Coinbase 1-minute candles (batch source of truth).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [product_id, minute_ts]
+    columns:
+      - name: product_id
+        description: Coinbase product, e.g. BTC-USD.
+        data_tests: [not_null]
+      - name: minute_ts
+        description: Start of the 1-minute bucket (UTC).
+        data_tests: [not_null]
+      - name: open
+        description: Price of the first trade in the minute.
+      - name: high
+        description: Highest trade price in the minute.
+      - name: low
+        description: Lowest trade price in the minute.
+      - name: close
+        description: Price of the last trade in the minute.
+      - name: volume
+        description: Traded size in the base currency.
+
+  - name: stg_candles_stream
+    description: 1-minute candles built from the WebSocket stream (and backfilled trades).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [product_id, minute_ts]
+    columns:
+      - name: product_id
+        description: Coinbase product, e.g. BTC-USD.
+        data_tests: [not_null]
+      - name: minute_ts
+        description: Start of the 1-minute bucket (UTC).
+        data_tests: [not_null]
+      - name: open
+        description: Price of the lowest trade_id in the minute.
+      - name: high
+        description: Highest trade price in the minute.
+      - name: low
+        description: Lowest trade price in the minute.
+      - name: close
+        description: Price of the highest trade_id in the minute.
+      - name: volume
+        description: Sum of trade sizes in the minute.
+      - name: trade_count
+        description: Number of trades in the minute.
+      - name: first_trade_id
+        description: Lowest trade_id in the minute.
+      - name: last_trade_id
+        description: Highest trade_id in the minute.

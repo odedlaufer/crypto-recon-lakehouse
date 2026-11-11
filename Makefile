@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 TARGET ?= dev
 
-.PHONY: help setup lint test validate deploy dbt-debug run-producer docker-build backfill
+.PHONY: help setup lint test validate deploy dbt-debug dbt run-producer docker-build backfill
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  %-14s %s\n", $$1, $$2}'
@@ -37,3 +37,6 @@ backfill: ## Fetch official candles to dev, START=YYYY-MM-DD END=YYYY-MM-DD
 
 docker-build: ## Build the producer image (crypto-recon-producer:dev)
 	docker build -f producer/Dockerfile -t crypto-recon-producer:dev .
+
+dbt: ## Run dbt in dbt/, e.g. make dbt ARGS="build --select staging"
+	cd dbt && uv run --group dbt dbt $(ARGS)
