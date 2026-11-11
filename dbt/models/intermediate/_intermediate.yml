@@ -1,0 +1,13 @@
+version: 2
+
+models:
+  - name: int_reconciliation_1m
+    description: >-
+      Full outer join of stream and official candles per product-minute with a
+      reconciliation status (FR-R2, FR-R3). No scope filter.
+    columns:
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [MATCH, VOLUME_DRIFT, PRICE_MISMATCH, MISSING_IN_STREAM, MISSING_IN_BATCH]

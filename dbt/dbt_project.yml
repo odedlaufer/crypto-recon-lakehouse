@@ -11,6 +11,11 @@ vars:
   settlement_minutes: 15
   # FR-R3 / FR-R5: MATCH allows a relative volume difference up to this percentage.
   volume_tolerance_pct: 0.01
+  # First day reconciled; earlier official candles are history without stream data.
+  reconcile_start_date: "2026-11-10"
+  # Incremental runs re-reconcile this many recent days, so repairs (Phase 3) and late
+  # official corrections update status_after_repair.
+  reconcile_lookback_days: 3
 
 models:
   crypto_recon:
@@ -20,3 +25,8 @@ models:
     staging:
       +schema: staging
       +materialized: view
+    intermediate:
+      +schema: staging
+      +materialized: view
+    marts:
+      +schema: marts
