@@ -1,0 +1,84 @@
+name: daily-batch
+
+# Daily orchestration (ADR-010): fetch yesterday's official candles, run the Databricks
+# daily job (candles WAP + stream refresh), then reconcile with dbt.
+
+on:
+  schedule:
+    - cron: "37 0 * * *" # 00:37 UTC: yesterday is complete; off the busy top of hour
+  workflow_dispatch:
+    inputs:
+      date:
+        description: UTC day to process (YYYY-MM-DD). Empty means yesterday.
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily-batch
+  cancel-in-progress: false
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 60
+    env:
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      VOLUME_PATH: /Volumes/crypto_dev/raw/landing
+    steps:
+      - name: Resolve day
+        id: day
+        env:
+          INPUT_DATE: ${{ inputs.date }}
+        run: |
+          DAY="${INPUT_DATE:-$(date -u -d yesterday +%F)}"
+          if ! [[ "$DAY" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]; then
+            echo "invalid date: $DAY"; exit 1
+          fi
+          echo "day=$DAY" >> "$GITHUB_OUTPUT"
+          echo "Processing $DAY"
+
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+
+      - uses: databricks/setup-cli@main
+        with:
+          version: 1.25.0
+
+      - name: Install
+        run: uv sync --frozen --all-packages --group dbt
+
+      - name: Fetch official candles
+        run: |
+          uv run --no-sync python -m crypto_recon_fetchers candles \
+            --start "${{ steps.day.outputs.day }}" --end "${{ steps.day.outputs.day }}" \
+            --volume-path "$VOLUME_PATH"
+
+      - name: Databricks daily job (candles WAP + stream refresh)
+        run: |
+          databricks bundle run daily -t dev \
+            --params "start_date=${{ steps.day.outputs.day }},end_date=${{ steps.day.outputs.day }}"
+
+      - name: dbt build (reconciliation)
+        working-directory: dbt
+        run: |
+          uv run --no-sync dbt deps
+          uv run --no-sync dbt build --target ci_dev
+
+      - name: Upload dbt artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dbt-artifacts-${{ github.run_id }}
+          path: |
+            dbt/target/run_results.json
+            dbt/target/manifest.json
+            dbt/logs/dbt.log
+          retention-days: 14
