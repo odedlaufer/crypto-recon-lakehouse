@@ -1,0 +1,64 @@
+version: 2
+
+models:
+  - name: fct_reconciliation_1m
+    description: >-
+      One row per reconciled product-minute (FR-R1 to FR-R4). Only minutes past the
+      settlement window and within published official days. status_before_repair is the
+      status at first reconciliation; status_after_repair is the latest.
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [product_id, minute_ts]
+    columns:
+      - name: product_id
+        data_type: string
+        description: Coinbase product, e.g. BTC-USD.
+        constraints:
+          - type: not_null
+      - name: minute_ts
+        data_type: timestamp
+        description: Start of the 1-minute bucket (UTC).
+        constraints:
+          - type: not_null
+      - name: status_before_repair
+        data_type: string
+        description: Status when the minute was first reconciled (raw completeness).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [MATCH, VOLUME_DRIFT, PRICE_MISMATCH, MISSING_IN_STREAM, MISSING_IN_BATCH]
+      - name: status_after_repair
+        data_type: string
+        description: Latest status (repaired completeness).
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [MATCH, VOLUME_DRIFT, PRICE_MISMATCH, MISSING_IN_STREAM, MISSING_IN_BATCH]
+      - name: open_delta
+        data_type: decimal(38,18)
+        description: Stream open minus official open; null when a side is missing.
+      - name: high_delta
+        data_type: decimal(38,18)
+        description: Stream high minus official high.
+      - name: low_delta
+        data_type: decimal(38,18)
+        description: Stream low minus official low.
+      - name: close_delta
+        data_type: decimal(38,18)
+        description: Stream close minus official close.
+      - name: volume_delta_pct
+        data_type: double
+        description: (stream volume - official volume) / official volume * 100.
+      - name: stream_trade_count
+        data_type: bigint
+        description: Trades in the stream candle; null when the stream has no candle.
+      - name: first_reconciled_at
+        data_type: timestamp
+        description: When the minute was first reconciled.
+      - name: last_reconciled_at
+        data_type: timestamp
+        description: When the minute was last reconciled.
