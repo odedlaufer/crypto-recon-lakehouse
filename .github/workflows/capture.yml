@@ -1,0 +1,60 @@
+name: capture
+
+# Runs the WebSocket producer in capture windows (FR-P7).
+# A window starts every 5 hours and lasts 5h45m, so consecutive windows overlap by at
+# least 45 minutes and leave no hole even if a scheduled start is delayed. silver.trades
+# drops the duplicate trades from the overlap (FR-S3). See ADR-008.
+
+on:
+  schedule:
+    - cron: "7 */5 * * *" # 00:07, 05:07, 10:07, 15:07, 20:07 UTC (off the busy top of hour)
+  workflow_dispatch:
+    inputs:
+      duration_minutes:
+        description: Capture length in minutes (1 to 345)
+        required: true
+        default: "345"
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 360
+    env:
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      DURATION_MINUTES: ${{ inputs.duration_minutes || '345' }}
+      VOLUME_PATH: /Volumes/crypto_dev/raw/landing
+    steps:
+      - name: Check duration
+        run: |
+          if ! [[ "$DURATION_MINUTES" =~ ^[0-9]+$ ]] || (( DURATION_MINUTES < 1 || DURATION_MINUTES > 345 )); then
+            echo "duration_minutes must be 1 to 345 (job limit is 360)"; exit 1
+          fi
+
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install producer only
+        run: uv sync --frozen --no-dev --package crypto-recon-producer
+
+      - name: Capture
+        run: |
+          uv run --no-sync python -m crypto_recon_producer \
+            --duration-seconds $(( DURATION_MINUTES * 60 )) \
+            --volume-path "$VOLUME_PATH" \
+            --log-file data/capture.log
+
+      - name: Upload capture log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: capture-log-${{ github.run_id }}
+          path: data/capture.log
+          retention-days: 14
