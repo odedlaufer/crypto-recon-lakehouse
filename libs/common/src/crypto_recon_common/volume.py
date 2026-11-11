@@ -82,8 +82,12 @@ class VolumeUploader:
 
     def sweep(self) -> SweepResult:
         """Upload every pending file once. Failures are logged and kept for the next sweep."""
+        return self.upload_files(self.pending())
+
+    def upload_files(self, paths: list[Path]) -> SweepResult:
+        """Upload the given files (each under `local_root`); delete each one on success."""
         result = SweepResult()
-        for path in self.pending():
+        for path in paths:
             remote = self.remote_path(path)
             try:
                 # File names are unique, so overwrite only matters when an earlier upload

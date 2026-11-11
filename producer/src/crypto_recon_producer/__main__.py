@@ -7,10 +7,10 @@ import asyncio
 import logging
 import signal
 import threading
-import time
 from pathlib import Path
 
 from crypto_recon_common.config import load_products_config
+from crypto_recon_common.logs import configure_logging
 from crypto_recon_common.volume import VolumeUploader, connect_files_client, upload_continuously
 from crypto_recon_producer.batching import Batcher
 from crypto_recon_producer.client import COINBASE_WS_URL, Producer
@@ -50,21 +50,6 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def _configure_logging(level: str, log_file: Path | None = None) -> None:
-    logging.Formatter.converter = time.gmtime
-    handlers: list[logging.Handler] = [logging.StreamHandler()]
-    if log_file is not None:
-        log_file.parent.mkdir(parents=True, exist_ok=True)
-        handlers.append(logging.FileHandler(log_file, encoding="utf-8"))
-    logging.basicConfig(
-        level=level.upper(),
-        format="%(asctime)s.%(msecs)03dZ %(levelname)s %(name)s: %(message)s",
-        datefmt="%Y-%m-%dT%H:%M:%S",
-        handlers=handlers,
-        force=True,
-    )
-
-
 async def _run(args: argparse.Namespace) -> None:
     products = load_products_config(args.config).products
     producer = Producer(products, Batcher(args.output_dir), url=args.url)
@@ -100,7 +85,7 @@ async def _run(args: argparse.Namespace) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
-    _configure_logging(args.log_level, args.log_file)
+    configure_logging(args.log_level, args.log_file)
     asyncio.run(_run(args))
     return 0
 

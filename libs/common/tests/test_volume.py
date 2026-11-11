@@ -92,3 +92,12 @@ def test_upload_continuously_does_final_sweep_on_stop(tmp_path: Path) -> None:
     stop.set()
     upload_continuously(VolumeUploader(files, tmp_path, VOLUME), stop, interval_seconds=60)
     assert list(files.uploads) == [f"{VOLUME}/ws/a.jsonl"]
+
+
+def test_upload_files_uploads_only_the_given_files(tmp_path: Path) -> None:
+    mine = _make(tmp_path, "rest/candles/dt=2026-11-10/c.jsonl")
+    other = _make(tmp_path, "ws/matches/m.jsonl")
+    files = FakeFiles()
+    result = VolumeUploader(files, tmp_path, VOLUME).upload_files([mine])
+    assert result.uploaded == [f"{VOLUME}/rest/candles/dt=2026-11-10/c.jsonl"]
+    assert other.exists()
