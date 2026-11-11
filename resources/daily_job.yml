@@ -1,0 +1,28 @@
+resources:
+  jobs:
+    daily:
+      name: crypto-recon-daily-${bundle.target}
+      description: >-
+        Daily Databricks work, triggered by GitHub Actions after the candles are fetched
+        (ADR-010): publish official candles through the WAP gate and refresh the stream
+        pipeline. dbt runs afterwards from GitHub Actions.
+      max_concurrent_runs: 1
+      email_notifications:
+        on_failure:
+          - odedlaufer1@gmail.com
+      parameters:
+        - name: start_date
+          default: ""  # YYYY-MM-DD; empty means yesterday UTC
+        - name: end_date
+          default: ""  # YYYY-MM-DD; empty means start_date
+      tasks:
+        - task_key: candles_official
+          run_job_task:
+            job_id: ${resources.jobs.candles_official.id}
+            job_parameters:
+              start_date: "{{job.parameters.start_date}}"
+              end_date: "{{job.parameters.end_date}}"
+
+        - task_key: refresh_stream
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.stream.id}

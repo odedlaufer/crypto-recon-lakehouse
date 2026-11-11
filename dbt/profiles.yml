@@ -18,3 +18,12 @@ crypto_recon:
       schema: marts
       token: "{{ env_var('DATABRICKS_TOKEN') }}"
       threads: 4
+
+    ci_dev:  # GitHub Actions: same catalog as dev, token auth (no browser for OAuth)
+      type: databricks
+      host: dbc-c6f5458b-d402.cloud.databricks.com
+      http_path: /sql/1.0/warehouses/8330a90a8089093e
+      catalog: crypto_dev
+      schema: marts
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      threads: 4
