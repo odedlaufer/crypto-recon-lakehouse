@@ -10,3 +10,4 @@
 | [ADR-006](ADR-006-catalog-per-environment.md) | One Unity Catalog catalog per environment | Accepted |
 | [ADR-007](ADR-007-dbt-core-v1.md) | dbt Core v1 instead of dbt v2 | Accepted |
 | [ADR-008](ADR-008-ci-capture.md) | Capture in GitHub Actions with overlapping windows, PAT auth | Accepted |
+| [ADR-009](ADR-009-gold-candles-materialized-view.md) | Build gold.candles_stream_1m as a materialized view | Accepted |
