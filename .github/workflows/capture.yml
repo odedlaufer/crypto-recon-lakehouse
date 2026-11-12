@@ -1,22 +1,29 @@
 name: capture
 
-# Runs the WebSocket producer in capture windows (FR-P7).
-# A window starts every 5 hours and lasts 5h45m, so consecutive windows overlap by at
-# least 45 minutes and leave no hole even if a scheduled start is delayed. silver.trades
-# drops the duplicate trades from the overlap (FR-S3). See ADR-008.
+# Runs the WebSocket producer in capture windows (FR-P7, ADR-008).
+# Continuity comes from self-chaining: about 15 minutes before a window ends, the run
+# starts the next one (overlapping), unless another capture run already covers the next
+# 30+ minutes. silver.trades drops the duplicate trades from overlaps (FR-S3).
+# The cron schedule is only a backup that restarts the chain if it ever breaks; GitHub
+# delays or skips scheduled runs, so it cannot provide continuity on its own.
 
 on:
   schedule:
-    - cron: "7 */5 * * *" # 00:07, 05:07, 10:07, 15:07, 20:07 UTC (off the busy top of hour)
+    - cron: "7 */5 * * *" # backup only: 00:07, 05:07, 10:07, 15:07, 20:07 UTC
   workflow_dispatch:
     inputs:
       duration_minutes:
         description: Capture length in minutes (1 to 345)
         required: true
         default: "345"
+      chain:
+        description: Start the next window before this one ends (runs of 60+ minutes)
+        type: boolean
+        default: true
 
 permissions:
   contents: read
+  actions: write # start the next capture window (chain)
 
 jobs:
   capture:
@@ -27,6 +34,8 @@ jobs:
       DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
       DURATION_MINUTES: ${{ inputs.duration_minutes || '345' }}
+      CHAIN: ${{ github.event_name == 'schedule' || inputs.chain }}
+      HANDOFF_LEAD_SECONDS: "900"
       VOLUME_PATH: /Volumes/crypto_dev/raw/landing
     steps:
       - name: Check duration
@@ -44,12 +53,27 @@ jobs:
       - name: Install producer only
         run: uv sync --frozen --no-dev --package crypto-recon-producer
 
-      - name: Capture
+      - name: Capture (and hand off to the next window)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           uv run --no-sync python -m crypto_recon_producer \
             --duration-seconds $(( DURATION_MINUTES * 60 )) \
             --volume-path "$VOLUME_PATH" \
-            --log-file data/capture.log
+            --log-file data/capture.log &
+          producer=$!
+
+          if [[ "$CHAIN" == "true" ]] && (( DURATION_MINUTES >= 60 )); then
+            handoff_at=$(( SECONDS + DURATION_MINUTES * 60 - HANDOFF_LEAD_SECONDS ))
+            while kill -0 "$producer" 2>/dev/null && (( SECONDS < handoff_at )); do sleep 30; done
+            if kill -0 "$producer" 2>/dev/null; then
+              .github/scripts/capture_handoff.sh || echo "::warning::handoff failed; the cron backup will restart the chain"
+            else
+              echo "::warning::producer stopped before the handoff; not chaining (the cron backup will restart)"
+            fi
+          fi
+          wait "$producer"
 
       - name: Upload capture log
         if: always()

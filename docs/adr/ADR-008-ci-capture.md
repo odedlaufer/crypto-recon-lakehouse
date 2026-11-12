@@ -24,3 +24,18 @@ account console or account-level APIs, which service-principal OAuth depends on.
 - Overlaps land duplicate trades in bronze; silver.trades drops them (FR-S3).
 - The token is tied to a user and expires; rotation goes in the runbook.
 - GitHub disables scheduled workflows after 60 days without repository activity.
+
+## Amendment (2026-11-12): self-chaining
+Observed on 2026-11-11 and 2026-11-12: of 6 scheduled capture slots, 2 ran (2h44m and
+1h45m late) and 4 were skipped; the daily-batch slot ran 7 hours late. Cron alone cannot
+provide continuity.
+
+- Each run of 60+ minutes starts the next 345-minute window about 15 minutes before it
+  ends (`workflow_dispatch` via `GITHUB_TOKEN`, which GitHub allows to create runs).
+- Guard (`.github/scripts/capture_handoff.sh`): no handoff if another capture run is
+  queued or will keep capturing for 30+ minutes, so a cron-started run and the chain
+  converge to one chain.
+- No handoff if the producer has already stopped, which prevents a fast crash loop.
+- The cron schedule remains as a backup that restarts a broken chain.
+- daily-batch keeps cron only: it is idempotent and re-fetches 2 days, so delays or a
+  skipped day are absorbed by the next run.
