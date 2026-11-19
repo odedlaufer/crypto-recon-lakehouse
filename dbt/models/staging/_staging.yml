@@ -56,7 +56,9 @@ models:
         description: Highest trade_id in the minute.
 
   - name: stg_trades
-    description: One row per trade (product_id, trade_id), as needed for gap detection.
+    description: >-
+      Every known trade from the stream and from REST backfill (ADR-014); a trade can
+      appear in both.
     columns:
       - name: product_id
         description: Coinbase product, e.g. BTC-USD.
@@ -64,3 +66,8 @@ models:
         description: Coinbase trade id; contiguous per product (ADR-002).
       - name: exchange_time
         description: Trade time from Coinbase (UTC).
+      - name: source
+        description: stream or backfill.
+
+  - name: stg_backfill_attempts
+    description: One row per gap per backfill run (requested, received, missing from REST).

@@ -8,10 +8,14 @@
     )
 }}
 
--- FR-J2, ADR-002, ADR-013: one row per gap in trade ids per product.
+-- FR-J2, FR-J3, ADR-002, ADR-013: one row per gap in trade ids per product.
 -- Detection scans the last gap_lookback_days of trades. Every run also re-checks the
--- gaps that are still open: a gap is repaired once all of its ids are in silver.trades.
--- A newly detected break inside a known open gap (a partial repair) is not a new gap.
+-- gaps that are still open:
+--   repaired      all of the gap's ids are now known (stream or backfill)
+--   unrepairable  the latest backfill attempt found ids missing from REST, and every id
+--                 REST did return is already loaded
+--   open          otherwise
+-- A newly detected break inside a known gap (a partial repair) is not a new gap.
 
 with recent_trades as (
     select product_id, trade_id, exchange_time
@@ -75,14 +79,40 @@ candidates as (
 ),
 {% endif %}
 
-present as (
+latest_attempt as (
+    select gap_id, received, missing
+    from (
+        select
+            gap_id,
+            received,
+            missing,
+            row_number() over (partition by gap_id order by fetched_at desc) as attempt_rank
+        from {{ ref('stg_backfill_attempts') }}
+    ) as ranked
+    where attempt_rank = 1
+),
+
+present_counts as (
     select c.gap_id, count(distinct t.trade_id) as present_count
     from candidates as c
     inner join {{ ref('stg_trades') }} as t
         on t.product_id = c.product_id
         and t.trade_id between c.from_trade_id and c.to_trade_id
-        and t.exchange_time between c.gap_start_time and c.gap_end_time
+        -- The trade-id range decides; the time window only narrows the scan. It is widened
+        -- because REST and WebSocket can timestamp the same trade 1 microsecond apart.
+        and t.exchange_time between c.gap_start_time - interval 1 minute
+            and c.gap_end_time + interval 1 minute
     group by c.gap_id
+),
+
+evaluated as (
+    select
+        c.*,
+        coalesce(p.present_count, 0) as ids_present,
+        a.missing as rest_missing
+    from candidates as c
+    left join present_counts as p on c.gap_id = p.gap_id
+    left join latest_attempt as a on c.gap_id = a.gap_id
 )
 
 select
@@ -94,14 +124,15 @@ select
     c.gap_start_time,
     c.gap_end_time,
     c.detected_at,
-    cast(coalesce(p.present_count, 0) as bigint) as present_count,
+    cast(c.ids_present as bigint) as present_count,
     case
-        when coalesce(p.present_count, 0) >= c.missing_count then 'repaired'
+        when c.ids_present >= c.missing_count then 'repaired'
+        when c.rest_missing > 0 and c.ids_present >= c.missing_count - c.rest_missing
+            then 'unrepairable'
         else 'open'
     end as status,
     case
-        when coalesce(p.present_count, 0) >= c.missing_count then current_timestamp()
+        when c.ids_present >= c.missing_count then current_timestamp()
     end as repaired_at,
     current_timestamp() as last_checked_at
-from candidates as c
-left join present as p on c.gap_id = p.gap_id
+from evaluated as c

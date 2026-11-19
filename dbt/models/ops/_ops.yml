@@ -3,9 +3,10 @@ version: 2
 models:
   - name: gaps
     description: >-
-      One row per gap in trade ids per product (FR-J2, ADR-002, ADR-013). Status is
-      re-evaluated on every run: open until every missing trade id is present in
-      silver.trades, then repaired. (unrepairable is added with backfill, Phase 3.)
+      One row per gap in trade ids per product (FR-J2, FR-J3, ADR-002, ADR-013). Open
+      gaps are re-evaluated on every run: repaired once every missing trade id is known
+      (stream or backfill); unrepairable when the latest backfill attempt found ids
+      missing from REST and everything REST returned is loaded.
     config:
       contract:
         enforced: true
@@ -41,14 +42,14 @@ models:
         description: When the gap was first detected.
       - name: present_count
         data_type: bigint
-        description: How many of the missing ids are now in silver.trades.
+        description: How many of the missing ids are now known (stream or backfill).
       - name: status
         data_type: string
-        description: open or repaired.
+        description: open, repaired or unrepairable.
         data_tests:
           - accepted_values:
               arguments:
-                values: [open, repaired]
+                values: [open, repaired, unrepairable]
       - name: repaired_at
         data_type: timestamp
         description: When the gap was first seen fully repaired.
