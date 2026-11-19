@@ -7,6 +7,7 @@ import asyncio
 import logging
 import signal
 import threading
+from datetime import timedelta
 from pathlib import Path
 
 from crypto_recon_common.config import load_products_config
@@ -40,6 +41,18 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         help="Databricks CLI profile. Default: DATABRICKS_HOST/DATABRICKS_TOKEN or DEFAULT.",
     )
     parser.add_argument("--upload-interval-seconds", type=float, default=5.0)
+    parser.add_argument(
+        "--flush-seconds",
+        type=float,
+        default=600.0,
+        help="Flush each batch after this many seconds (ADR-011: few, larger files).",
+    )
+    parser.add_argument(
+        "--max-messages",
+        type=int,
+        default=100_000,
+        help="Flush a batch early once it holds this many messages.",
+    )
     parser.add_argument("--log-level", default="INFO")
     parser.add_argument(
         "--log-file",
@@ -47,12 +60,22 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=None,
         help="Also append logs to this file (survives Ctrl+C, unlike piping to tee).",
     )
-    return parser.parse_args(argv)
+    args = parser.parse_args(argv)
+    if args.flush_seconds <= 0:
+        parser.error("--flush-seconds must be positive")
+    if args.max_messages < 1:
+        parser.error("--max-messages must be at least 1")
+    return args
 
 
 async def _run(args: argparse.Namespace) -> None:
     products = load_products_config(args.config).products
-    producer = Producer(products, Batcher(args.output_dir), url=args.url)
+    batcher = Batcher(
+        args.output_dir,
+        max_messages=args.max_messages,
+        max_age=timedelta(seconds=args.flush_seconds),
+    )
+    producer = Producer(products, batcher, url=args.url)
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()
