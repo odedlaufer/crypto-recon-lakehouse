@@ -90,3 +90,11 @@ SELECT product_id, status_before_repair, status_after_repair, count(*) AS minute
 FROM crypto_dev.marts.fct_reconciliation_1m
 GROUP BY ALL ORDER BY product_id, minutes DESC;
 ```
+
+## First dbt build in a fresh environment
+Incremental unit tests read column types from the existing table (`this`), so on a fresh
+target the first build must create the tables without tests:
+```bash
+make dbt ARGS="run"
+make dbt ARGS="build"
+```
