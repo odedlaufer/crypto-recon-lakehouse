@@ -220,12 +220,14 @@ version = "0.1.0"
 source = { editable = "fetchers" }
 dependencies = [
     { name = "crypto-recon-common" },
+    { name = "databricks-sdk" },
     { name = "httpx" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "crypto-recon-common", editable = "libs/common" },
+    { name = "databricks-sdk", specifier = ">=0.117.0" },
     { name = "httpx", specifier = ">=0.28.1" },
 ]
 

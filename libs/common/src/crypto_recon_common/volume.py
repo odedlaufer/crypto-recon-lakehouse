@@ -12,7 +12,10 @@ import logging
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from databricks.sdk import WorkspaceClient
 
 logger = logging.getLogger(__name__)
 
@@ -32,8 +35,8 @@ class FilesClient(Protocol):
     ) -> object: ...
 
 
-def connect_files_client(profile: str | None = None) -> FilesClient:
-    """Authenticate to Databricks and return its Files API.
+def connect_workspace(profile: str | None = None) -> WorkspaceClient:
+    """Authenticate to Databricks and return a workspace client.
 
     Uses the named CLI profile, or the standard environment variables
     (DATABRICKS_HOST, DATABRICKS_TOKEN) when no profile is given. Fails fast on bad auth.
@@ -43,7 +46,12 @@ def connect_files_client(profile: str | None = None) -> FilesClient:
     client = WorkspaceClient(profile=profile)
     user = client.current_user.me()
     logger.info("authenticated to %s as %s", client.config.host, user.user_name)
-    return client.files
+    return client
+
+
+def connect_files_client(profile: str | None = None) -> FilesClient:
+    """Authenticate to Databricks and return its Files API."""
+    return connect_workspace(profile).files
 
 
 @dataclass
