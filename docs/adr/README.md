@@ -13,3 +13,4 @@
 | [ADR-009](ADR-009-gold-candles-materialized-view.md) | Build gold.candles_stream_1m as a materialized view | Accepted |
 | [ADR-010](ADR-010-orchestration.md) | GitHub Actions orchestrates the daily flow; Databricks does the Spark work | Accepted |
 | [ADR-011](ADR-011-few-large-landing-files.md) | Land few, large files; process the stream daily | Accepted |
+| [ADR-012](ADR-012-official-mismatch.md) | Classify official-candle errors as OFFICIAL_MISMATCH | Accepted |
