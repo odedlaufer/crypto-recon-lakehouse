@@ -1,8 +1,12 @@
 name: daily-batch
 
-# Daily orchestration (ADR-010): fetch the last 2 days of official candles (yesterday plus a
-# re-fetch of the day before, so late corrections are picked up and Q5 can be measured),
-# run the Databricks daily job (candles WAP + stream refresh), then reconcile with dbt.
+# Daily orchestration (ADR-010), the full repair loop of Phase 3:
+#   1. fetch the last 2 days of official candles (yesterday plus a re-fetch for Q5)
+#   2. Databricks daily job: candles write-audit-publish + stream pipeline refresh
+#   3. dbt build: reconcile; first verdict of new minutes = status_before_repair
+#   4. backfill the trades of open gaps from REST (FR-B4)
+#   5. stream pipeline refresh: load the backfilled trades (ADR-014)
+#   6. dbt build: gaps repaired, status_after_repair updated (FR-J3)
 
 on:
   schedule:
@@ -25,10 +29,11 @@ jobs:
   daily:
     runs-on: ubuntu-latest
     environment: dev
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
       DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      DATABRICKS_WAREHOUSE_ID: 8330a90a8089093e # dev SQL warehouse (not a secret)
       VOLUME_PATH: /Volumes/crypto_dev/raw/landing
     steps:
       - name: Resolve date range
@@ -56,24 +61,38 @@ jobs:
           version: 1.25.0
 
       - name: Install
-        run: uv sync --frozen --all-packages --group dbt
+        run: |
+          uv sync --frozen --all-packages --group dbt
+          cd dbt && uv run --no-sync dbt deps
 
-      - name: Fetch official candles
+      - name: 1. Fetch official candles
         run: |
           uv run --no-sync python -m crypto_recon_fetchers candles \
             --start "${{ steps.range.outputs.start }}" --end "${{ steps.range.outputs.end }}" \
             --volume-path "$VOLUME_PATH"
 
-      - name: Databricks daily job (candles WAP + stream refresh)
+      - name: 2. Databricks daily job (candles WAP + stream refresh)
         run: |
           databricks bundle run daily -t dev \
             --params "start_date=${{ steps.range.outputs.start }},end_date=${{ steps.range.outputs.end }}"
 
-      - name: dbt build (reconciliation)
+      - name: 3. dbt build (reconcile; raw verdict)
         working-directory: dbt
+        run: uv run --no-sync dbt build --target ci_dev
+
+      - name: 4. Backfill open gaps from REST
+        id: backfill
+        continue-on-error: true # a failed gap must not block loading the others
         run: |
-          uv run --no-sync dbt deps
-          uv run --no-sync dbt build --target ci_dev
+          uv run --no-sync python -m crypto_recon_fetchers backfill \
+            --catalog crypto_dev --volume-path "$VOLUME_PATH"
+
+      - name: 5. Stream pipeline refresh (load backfilled trades)
+        run: databricks bundle run stream -t dev
+
+      - name: 6. dbt build (repaired verdict)
+        working-directory: dbt
+        run: uv run --no-sync dbt build --target ci_dev
 
       - name: Upload dbt artifacts
         if: always()
@@ -85,3 +104,9 @@ jobs:
             dbt/target/manifest.json
             dbt/logs/dbt.log
           retention-days: 14
+
+      - name: Fail if the backfill failed
+        if: steps.backfill.outcome == 'failure'
+        run: |
+          echo "::error::backfill reported failed gaps or uploads; see step 4"
+          exit 1
