@@ -26,7 +26,7 @@ uploaded to `/Volumes/crypto_dev/raw/landing`, loaded by the `crypto-recon-strea
 - Q1 answered in [ADR-002](adr/ADR-002-gap-detection.md): trade ids are contiguous per product.
 - Q2 answered in [ADR-003](adr/ADR-003-backfill-strategy.md): REST trades reach months back by trade-id cursor.
 
-## Phase 2: Batch and reconciliation (in progress)
+## Phase 2: Batch and reconciliation (passed 2026-11-19)
 Gate: one full day reconciled; status mix visible in a query.
 
 ### Built and verified
@@ -67,3 +67,34 @@ the previous day on every run, so evidence accumulates for ADR-011.
   a manual 345-minute run was started instead. Next slot to confirm: 15:07 UTC.
 - daily-batch schedule: first scheduled run due 2026-11-12 00:37 UTC.
 - Gate: needs a fully captured UTC day; earliest 2026-11-12, reconciled 2026-11-13.
+
+### Gate result (2026-11-19)
+Three fully captured days reconciled (`missing_in_stream = 0`, `missing_in_batch` at most 3):
+
+| Day | BTC-USD match | ETH-USD match | SOL-USD match |
+| --- | --- | --- | --- |
+| 2026-11-13 | 96.74% | 96.67% | 96.67% |
+| 2026-11-14 | 98.19% | 98.47% | 98.13% |
+| 2026-11-15 | 96.39% | 96.39% | 96.04% |
+
+Days before 2026-11-13 were only partly captured (missed cron slots); continuity came
+from self-chaining capture (ADR-008 amendment).
+
+### Why match is below 99.5%: diagnosis of 2026-11-14
+- No duplicates in silver (rows = distinct trade ids for all products).
+- **Stream gaps:** 13 trade-id breaks of 1 to 3 seconds (BTC 220 ids, ETH 13, SOL 3).
+  They explain exactly the VOLUME_DRIFT minutes; repairable from REST (Phase 3).
+- **Official-candle errors:** the PRICE_MISMATCH minutes (about 20 per product, mostly
+  pairs of consecutive minutes hitting all products at once) have no stream gap. Over
+  each 2-minute event the official volume is lower than the stream's for every product
+  (15 to 58% lower), so trades are missing from the official candles, not shifted
+  between minutes. Same pattern as 2026-11-10 15:20, where REST trades matched the
+  stream exactly. Not repairable; handled by ADR-012.
+
+### Updates to the open items
+- Capture continuity: solved by self-chaining (ADR-008 amendment); fully captured from
+  2026-11-13.
+- daily-batch: refused by Databricks since 2026-11-17 ("Triggering new runs ... disabled
+  temporarily"), caused by Volume API operations from many small files; fixed in
+  ADR-011, waiting for the limit to lift. Official candles for 2026-11-16 to 2026-11-18
+  to be re-run once allowed.
