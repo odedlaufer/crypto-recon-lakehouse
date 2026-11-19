@@ -28,8 +28,9 @@ unit_tests:
 
   - name: reconciliation_scope_incremental
     description: >-
-      Incremental run: a minute already reconciled and outside the lookback is skipped;
-      a never-reconciled old minute (e.g. official candles backfilled later) is included.
+      Incremental run outside the lookback: an already reconciled minute is skipped; a
+      never-reconciled minute is included; a minute still on the stream side is
+      re-reconciled, because gap repair can fix it.
     model: fct_reconciliation_1m
     overrides:
       macros:
@@ -40,7 +41,8 @@ unit_tests:
     given:
       - input: this
         rows:
-          - {product_id: BTC-USD, minute_ts: "2026-11-05 12:00:00"}
+          - {product_id: BTC-USD, minute_ts: "2026-11-05 12:00:00", status_after_repair: MATCH}
+          - {product_id: BTC-USD, minute_ts: "2026-11-05 12:02:00", status_after_repair: VOLUME_DRIFT}
       - input: ref('stg_candles_official')
         rows:
           - {product_id: BTC-USD, minute_ts: "2026-11-05 23:59:00"}
@@ -48,6 +50,8 @@ unit_tests:
         rows:
           - {product_id: BTC-USD, minute_ts: "2026-11-05 12:00:00", status: MATCH}
           - {product_id: BTC-USD, minute_ts: "2026-11-05 12:01:00", status: MISSING_IN_STREAM}
+          - {product_id: BTC-USD, minute_ts: "2026-11-05 12:02:00", status: MATCH}
     expect:
       rows:
-        - {product_id: BTC-USD, minute_ts: "2026-11-05 12:01:00", status_before_repair: MISSING_IN_STREAM}
+        - {product_id: BTC-USD, minute_ts: "2026-11-05 12:01:00", status_after_repair: MISSING_IN_STREAM}
+        - {product_id: BTC-USD, minute_ts: "2026-11-05 12:02:00", status_after_repair: MATCH}

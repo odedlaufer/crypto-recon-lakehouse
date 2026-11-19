@@ -39,18 +39,23 @@ candidates as (
 
 {% if is_incremental() %}
 already_reconciled as (
-    select product_id, minute_ts from {{ this }}
+    select product_id, minute_ts, status_after_repair from {{ this }}
 ),
 
 in_scope as (
-    -- Re-reconcile recent days (repairs, late official corrections) plus any minute not
-    -- reconciled yet (e.g. an older day whose official candles were backfilled later).
+    -- Re-reconcile:
+    --   recent days (late official corrections),
+    --   minutes not reconciled yet (e.g. official candles backfilled later), and
+    --   minutes still on the stream side, at any age, because gap repair can fix them.
     select c.*
     from candidates as c
     left join already_reconciled as a
         on c.product_id = a.product_id and c.minute_ts = a.minute_ts
     where c.minute_ts >= current_timestamp() - interval {{ var('reconcile_lookback_days') }} days
        or a.product_id is null
+       or a.status_after_repair in (
+           'PRICE_MISMATCH', 'VOLUME_DRIFT', 'MISSING_IN_STREAM', 'MISSING_IN_BATCH'
+       )
 )
 {% else %}
 in_scope as (

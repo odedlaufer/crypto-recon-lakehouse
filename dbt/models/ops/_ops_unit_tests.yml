@@ -19,6 +19,8 @@ unit_tests:
           - {product_id: BTC-USD, trade_id: 10, exchange_time: "2026-11-14 00:00:10"}
           - {product_id: SOL-USD, trade_id: 3, exchange_time: "2026-11-14 00:00:03"}
           - {product_id: SOL-USD, trade_id: 4, exchange_time: "2026-11-14 00:00:04"}
+      - input: ref('stg_backfill_attempts')
+        rows: []
     expect:
       rows:
         - {product_id: BTC-USD, from_trade_id: 3, to_trade_id: 4, missing_count: 2, present_count: 0, status: open}
@@ -28,7 +30,8 @@ unit_tests:
     description: >-
       An open gap whose ids are now present becomes repaired; a break inside a tracked
       gap (partial repair) is not a new gap; a new break is added; repaired gaps are not
-      re-evaluated.
+      re-evaluated; a gap whose latest backfill attempt found ids missing from REST, with
+      everything REST returned loaded, becomes unrepairable.
     model: gaps
     overrides:
       macros:
@@ -41,20 +44,30 @@ unit_tests:
           - {gap_id: g1, product_id: BTC-USD, from_trade_id: 3, to_trade_id: 4, missing_count: 2, gap_start_time: "2026-11-14 00:00:02", gap_end_time: "2026-11-14 00:00:05", present_count: 0, status: open}
           - {gap_id: g2, product_id: BTC-USD, from_trade_id: 7, to_trade_id: 9, missing_count: 3, gap_start_time: "2026-11-14 00:00:06", gap_end_time: "2026-11-14 00:00:10", present_count: 0, status: open}
           - {gap_id: g0, product_id: SOL-USD, from_trade_id: 1, to_trade_id: 2, missing_count: 2, gap_start_time: "2026-11-14 00:00:00", gap_end_time: "2026-11-14 00:00:03", present_count: 2, status: repaired}
+          - {gap_id: g3, product_id: ETH-USD, from_trade_id: 20, to_trade_id: 23, missing_count: 4, gap_start_time: "2026-11-14 00:00:19", gap_end_time: "2026-11-14 00:00:24", present_count: 0, status: open}
       - input: ref('stg_trades')
         rows:
           - {product_id: BTC-USD, trade_id: 1, exchange_time: "2026-11-14 00:00:01"}
           - {product_id: BTC-USD, trade_id: 2, exchange_time: "2026-11-14 00:00:02"}
           - {product_id: BTC-USD, trade_id: 3, exchange_time: "2026-11-14 00:00:03"}
-          - {product_id: BTC-USD, trade_id: 4, exchange_time: "2026-11-14 00:00:04"}
+          - {product_id: BTC-USD, trade_id: 4, exchange_time: "2026-11-14 00:00:05.000001"}
           - {product_id: BTC-USD, trade_id: 5, exchange_time: "2026-11-14 00:00:05"}
           - {product_id: BTC-USD, trade_id: 6, exchange_time: "2026-11-14 00:00:06"}
           - {product_id: BTC-USD, trade_id: 7, exchange_time: "2026-11-14 00:00:07"}
           - {product_id: BTC-USD, trade_id: 10, exchange_time: "2026-11-14 00:00:10"}
           - {product_id: BTC-USD, trade_id: 11, exchange_time: "2026-11-14 00:00:11"}
           - {product_id: BTC-USD, trade_id: 14, exchange_time: "2026-11-14 00:00:14"}
+          - {product_id: ETH-USD, trade_id: 19, exchange_time: "2026-11-14 00:00:19"}
+          - {product_id: ETH-USD, trade_id: 20, exchange_time: "2026-11-14 00:00:20"}
+          - {product_id: ETH-USD, trade_id: 21, exchange_time: "2026-11-14 00:00:21"}
+          - {product_id: ETH-USD, trade_id: 24, exchange_time: "2026-11-14 00:00:24"}
+      - input: ref('stg_backfill_attempts')
+        rows:
+          - {gap_id: g3, received: 0, missing: 4, fetched_at: "2026-11-15 00:00:00"}
+          - {gap_id: g3, received: 2, missing: 2, fetched_at: "2026-11-16 00:00:00"}
     expect:
       rows:
         - {gap_id: g1, product_id: BTC-USD, from_trade_id: 3, to_trade_id: 4, missing_count: 2, present_count: 2, status: repaired}
         - {gap_id: g2, product_id: BTC-USD, from_trade_id: 7, to_trade_id: 9, missing_count: 3, present_count: 1, status: open}
         - {gap_id: ae43352265ed5b141823b8540a7d454c, product_id: BTC-USD, from_trade_id: 12, to_trade_id: 13, missing_count: 2, present_count: 0, status: open}
+        - {gap_id: g3, product_id: ETH-USD, from_trade_id: 20, to_trade_id: 23, missing_count: 4, present_count: 2, status: unrepairable}

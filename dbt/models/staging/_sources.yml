@@ -12,6 +12,8 @@ sources:
           freshness:  # FR-D4
             warn_after: {count: 30, period: minute}
             error_after: {count: 2, period: hour}
+      - name: trades_backfill
+        description: Trades fetched from REST to repair gaps (ADR-014).
       - name: candles_official
         description: Official Coinbase 1-minute candles, published by the write-audit-publish job.
         config:
@@ -19,6 +21,13 @@ sources:
           freshness:  # FR-D4
             warn_after: {count: 26, period: hour}
             error_after: {count: 50, period: hour}
+
+  - name: bronze
+    description: Raw ingested records.
+    schema: bronze
+    tables:
+      - name: backfill_attempts
+        description: One row per gap per backfill run (requested, received, missing).
 
   - name: gold
     description: Stream-built aggregates from the stream pipeline.
