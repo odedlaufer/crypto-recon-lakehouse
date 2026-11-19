@@ -10,4 +10,4 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: [MATCH, VOLUME_DRIFT, PRICE_MISMATCH, MISSING_IN_STREAM, MISSING_IN_BATCH]
+                values: [MATCH, OFFICIAL_MISMATCH, VOLUME_DRIFT, PRICE_MISMATCH, MISSING_IN_STREAM, MISSING_IN_BATCH]

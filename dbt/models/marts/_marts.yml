@@ -30,14 +30,14 @@ models:
         data_tests:
           - accepted_values:
               arguments:
-                values: [MATCH, VOLUME_DRIFT, PRICE_MISMATCH, MISSING_IN_STREAM, MISSING_IN_BATCH]
+                values: [MATCH, OFFICIAL_MISMATCH, VOLUME_DRIFT, PRICE_MISMATCH, MISSING_IN_STREAM, MISSING_IN_BATCH]
       - name: status_after_repair
         data_type: string
         description: Latest status (repaired completeness).
         data_tests:
           - accepted_values:
               arguments:
-                values: [MATCH, VOLUME_DRIFT, PRICE_MISMATCH, MISSING_IN_STREAM, MISSING_IN_BATCH]
+                values: [MATCH, OFFICIAL_MISMATCH, VOLUME_DRIFT, PRICE_MISMATCH, MISSING_IN_STREAM, MISSING_IN_BATCH]
       - name: open_delta
         data_type: decimal(38,18)
         description: Stream open minus official open; null when a side is missing.
