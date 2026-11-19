@@ -62,3 +62,53 @@ models:
       - name: last_reconciled_at
         data_type: timestamp
         description: When the minute was last reconciled.
+
+  - name: mart_completeness_hourly
+    description: >-
+      Raw vs repaired completeness and match rate per product-hour (PRD §2, ADR-012).
+      Completeness counts MATCH and OFFICIAL_MISMATCH minutes; match rate counts MATCH.
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [product_id, hour_ts]
+    columns:
+      - name: product_id
+        data_type: string
+        description: Coinbase product, e.g. BTC-USD.
+        constraints:
+          - type: not_null
+      - name: hour_ts
+        data_type: timestamp
+        description: Start of the hour (UTC).
+        constraints:
+          - type: not_null
+      - name: minutes
+        data_type: bigint
+        description: Reconciled minutes in the hour.
+      - name: complete_minutes_before
+        data_type: bigint
+        description: MATCH or OFFICIAL_MISMATCH before repair.
+      - name: complete_minutes_after
+        data_type: bigint
+        description: MATCH or OFFICIAL_MISMATCH after repair.
+      - name: match_minutes
+        data_type: bigint
+        description: MATCH after repair.
+      - name: official_mismatch_minutes
+        data_type: bigint
+        description: OFFICIAL_MISMATCH after repair (Coinbase's candle disagrees with its trades).
+      - name: raw_completeness_pct
+        data_type: double
+        description: complete_minutes_before / minutes * 100.
+      - name: repaired_completeness_pct
+        data_type: double
+        description: complete_minutes_after / minutes * 100.
+      - name: match_rate_pct
+        data_type: double
+        description: match_minutes / minutes * 100.
+      - name: last_reconciled_at
+        data_type: timestamp
+        description: Latest reconciliation of any minute in the hour.

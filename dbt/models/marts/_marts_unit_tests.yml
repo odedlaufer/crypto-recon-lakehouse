@@ -55,3 +55,19 @@ unit_tests:
       rows:
         - {product_id: BTC-USD, minute_ts: "2026-11-05 12:01:00", status_after_repair: MISSING_IN_STREAM}
         - {product_id: BTC-USD, minute_ts: "2026-11-05 12:02:00", status_after_repair: MATCH}
+
+  - name: completeness_hourly_metrics
+    description: Raw vs repaired completeness and match rate per product-hour.
+    model: mart_completeness_hourly
+    given:
+      - input: ref('fct_reconciliation_1m')
+        rows:
+          - {product_id: BTC-USD, minute_ts: "2026-11-14 07:30:00", status_before_repair: MATCH, status_after_repair: MATCH}
+          - {product_id: BTC-USD, minute_ts: "2026-11-14 07:31:00", status_before_repair: VOLUME_DRIFT, status_after_repair: MATCH}
+          - {product_id: BTC-USD, minute_ts: "2026-11-14 07:32:00", status_before_repair: OFFICIAL_MISMATCH, status_after_repair: OFFICIAL_MISMATCH}
+          - {product_id: BTC-USD, minute_ts: "2026-11-14 07:33:00", status_before_repair: MISSING_IN_STREAM, status_after_repair: MISSING_IN_STREAM}
+          - {product_id: BTC-USD, minute_ts: "2026-11-14 08:00:00", status_before_repair: MATCH, status_after_repair: MATCH}
+    expect:
+      rows:
+        - {product_id: BTC-USD, hour_ts: "2026-11-14 07:00:00", minutes: 4, complete_minutes_before: 2, complete_minutes_after: 3, match_minutes: 2, official_mismatch_minutes: 1, raw_completeness_pct: 50.0, repaired_completeness_pct: 75.0, match_rate_pct: 50.0}
+        - {product_id: BTC-USD, hour_ts: "2026-11-14 08:00:00", minutes: 1, complete_minutes_before: 1, complete_minutes_after: 1, match_minutes: 1, official_mismatch_minutes: 0, raw_completeness_pct: 100.0, repaired_completeness_pct: 100.0, match_rate_pct: 100.0}
