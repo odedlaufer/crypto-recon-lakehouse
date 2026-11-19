@@ -1,9 +1,10 @@
-"""gold.candles_stream_1m: 1-minute candles built from silver.trades (FR-S4, ADR-009).
+"""gold.candles_stream_1m: 1-minute candles built from all known trades (FR-S4, ADR-009).
 
-A materialized view, recomputed on each pipeline update, so trades added later by gap
-repair (FR-J3) automatically correct the affected minutes. Per product and minute:
-open = price of the lowest trade_id, close = price of the highest, plus high, low,
-volume (sum of size), trade_count and the first and last trade_id.
+A materialized view over silver.trades (stream) and silver.trades_backfill (REST repair,
+ADR-014), recomputed on each pipeline update, so backfilled trades correct the affected
+minutes automatically (FR-J3). Per product and minute: open = price of the lowest
+trade_id, close = price of the highest, plus high, low, volume (sum of size), trade_count
+and the first and last trade_id.
 """
 
 from pyspark import pipelines as dp
@@ -12,17 +13,21 @@ from pyspark.sql import functions as F
 
 spark = SparkSession.active()
 
+TRADE_COLUMNS = ["product_id", "trade_id", "price", "size", "exchange_time"]
+
 
 @dp.materialized_view(
     name="gold.candles_stream_1m",
-    comment="1-minute OHLCV candles built from silver.trades (stream and backfill).",
+    comment="1-minute OHLCV candles built from stream and backfilled trades.",
     table_properties={"quality": "gold"},
     cluster_by=["product_id", "minute_ts"],
 )
 def candles_stream_1m():
+    stream = spark.read.table("silver.trades").select(*TRADE_COLUMNS)
+    backfill = spark.read.table("silver.trades_backfill").select(*TRADE_COLUMNS)
     return (
-        spark.read.table("silver.trades")
-        # Safety net: a trade counted once even if it reached silver twice.
+        stream.unionByName(backfill)
+        # A trade counts once, whether it arrived by stream, backfill or both.
         .dropDuplicates(["product_id", "trade_id"])
         .groupBy("product_id", F.date_trunc("minute", "exchange_time").alias("minute_ts"))
         .agg(

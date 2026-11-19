@@ -15,3 +15,4 @@
 | [ADR-011](ADR-011-few-large-landing-files.md) | Land few, large files; process the stream daily | Accepted |
 | [ADR-012](ADR-012-official-mismatch.md) | Classify official-candle errors as OFFICIAL_MISMATCH | Accepted |
 | [ADR-013](ADR-013-gap-detector-dbt.md) | Gap detector as an incremental dbt model | Accepted |
+| [ADR-014](ADR-014-backfill-tables.md) | Backfilled trades in their own bronze and silver tables | Accepted |
