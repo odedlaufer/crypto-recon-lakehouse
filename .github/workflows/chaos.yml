@@ -1,0 +1,42 @@
+name: chaos
+
+# Fault injection (PRD §8.5). Each scenario has an expected outcome documented in
+# docs/chaos.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      scenario:
+        description: Scenario to run
+        type: choice
+        options:
+          - ch2-kill-producer
+      outage_minutes:
+        description: CH-2 only. Minutes with no capture running (1 to 60)
+        required: true
+        default: "10"
+
+permissions:
+  contents: read
+  actions: write # cancel and start capture runs
+
+jobs:
+  ch2-kill-producer:
+    if: inputs.scenario == 'ch2-kill-producer'
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      OUTAGE_MINUTES: ${{ inputs.outage_minutes }}
+    steps:
+      - name: Check outage length
+        run: |
+          if ! [[ "$OUTAGE_MINUTES" =~ ^[0-9]+$ ]] || (( OUTAGE_MINUTES < 1 || OUTAGE_MINUTES > 60 )); then
+            echo "outage_minutes must be 1 to 60"; exit 1
+          fi
+
+      - uses: actions/checkout@v6
+
+      - name: CH-2 stop capture, wait, restart
+        run: chaos/ch2_kill_producer.sh
