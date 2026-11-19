@@ -54,3 +54,13 @@ models:
         description: Lowest trade_id in the minute.
       - name: last_trade_id
         description: Highest trade_id in the minute.
+
+  - name: stg_trades
+    description: One row per trade (product_id, trade_id), as needed for gap detection.
+    columns:
+      - name: product_id
+        description: Coinbase product, e.g. BTC-USD.
+      - name: trade_id
+        description: Coinbase trade id; contiguous per product (ADR-002).
+      - name: exchange_time
+        description: Trade time from Coinbase (UTC).

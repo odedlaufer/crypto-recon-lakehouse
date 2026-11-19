@@ -14,3 +14,4 @@
 | [ADR-010](ADR-010-orchestration.md) | GitHub Actions orchestrates the daily flow; Databricks does the Spark work | Accepted |
 | [ADR-011](ADR-011-few-large-landing-files.md) | Land few, large files; process the stream daily | Accepted |
 | [ADR-012](ADR-012-official-mismatch.md) | Classify official-candle errors as OFFICIAL_MISMATCH | Accepted |
+| [ADR-013](ADR-013-gap-detector-dbt.md) | Gap detector as an incremental dbt model | Accepted |
