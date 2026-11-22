@@ -35,3 +35,13 @@ sources:
     tables:
       - name: candles_stream_1m
         description: 1-minute candles built from silver.trades (ADR-009).
+
+  - name: system_lakeflow
+    description: Databricks system tables for jobs (FR-O1).
+    database: system
+    schema: lakeflow
+    tables:
+      - name: job_run_timeline
+        description: One row per job run period (start, end, result).
+      - name: jobs
+        description: Job definitions over time (SCD); latest name per job_id.

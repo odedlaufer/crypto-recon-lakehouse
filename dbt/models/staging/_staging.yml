@@ -71,3 +71,6 @@ models:
 
   - name: stg_backfill_attempts
     description: One row per gap per backfill run (requested, received, missing from REST).
+
+  - name: stg_pipeline_events
+    description: The stream pipeline's event log (update progress, flow progress, expectations).

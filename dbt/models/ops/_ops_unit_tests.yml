@@ -71,3 +71,16 @@ unit_tests:
         - {gap_id: g2, product_id: BTC-USD, from_trade_id: 7, to_trade_id: 9, missing_count: 3, present_count: 1, status: open}
         - {gap_id: ae43352265ed5b141823b8540a7d454c, product_id: BTC-USD, from_trade_id: 12, to_trade_id: 13, missing_count: 2, present_count: 0, status: open}
         - {gap_id: g3, product_id: ETH-USD, from_trade_id: 20, to_trade_id: 23, missing_count: 4, present_count: 2, status: unrepairable}
+
+  - name: pipeline_expectations_summed_per_update
+    description: Expectation counts from several progress events of one update are summed.
+    model: pipeline_expectations
+    given:
+      - input: ref('stg_pipeline_events')
+        rows:
+          - {update_id: u1, event_ts: "2026-11-22 12:00:00", event_type: flow_progress, details: '{"flow_progress":{"data_quality":{"expectations":[{"name":"dq05","dataset":"silver.trades","passed_records":10,"failed_records":1}]}}}'}
+          - {update_id: u1, event_ts: "2026-11-22 12:01:00", event_type: flow_progress, details: '{"flow_progress":{"data_quality":{"expectations":[{"name":"dq05","dataset":"silver.trades","passed_records":5,"failed_records":0}]}}}'}
+          - {update_id: u1, event_ts: "2026-11-22 12:02:00", event_type: update_progress, details: '{"update_progress":{"state":"COMPLETED"}}'}
+    expect:
+      rows:
+        - {update_id: u1, dataset: silver.trades, expectation: dq05, passed_records: 15, failed_records: 1}
