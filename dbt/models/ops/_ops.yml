@@ -56,3 +56,59 @@ models:
       - name: last_checked_at
         data_type: timestamp
         description: When the gap was last evaluated.
+
+  - name: pipeline_runs
+    description: >-
+      One row per Databricks job run and stream pipeline update (FR-O1): timing, status,
+      success flag; for pipeline updates also rows written and rows quarantined.
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [run_type, run_id]
+    columns:
+      - name: run_id
+        description: Pipeline update id or job run id.
+        data_tests: [not_null]
+      - name: job_name
+        description: Job name, or crypto-recon-stream for pipeline updates.
+      - name: run_type
+        description: pipeline or job.
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [pipeline, job]
+      - name: started_at
+        description: First event or period start.
+      - name: ended_at
+        description: Last event or period end.
+      - name: duration_s
+        description: ended_at - started_at in seconds.
+      - name: status
+        description: Final state (COMPLETED / FAILED / CANCELED for pipelines; result_state for jobs).
+      - name: succeeded
+        description: True when the run completed successfully (pipeline success-rate SLO).
+      - name: rows_written
+        description: Rows written by non-quarantine flows (pipeline updates only).
+      - name: rows_quarantined
+        description: Rows written to quarantine tables (pipeline updates only).
+
+  - name: pipeline_expectations
+    description: >-
+      Expectation pass/fail counts per pipeline update, dataset and rule (FR-O4, §6.1).
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [update_id, dataset, expectation]
+    columns:
+      - name: update_id
+        description: Pipeline update id.
+      - name: dataset
+        description: Table the expectation belongs to.
+      - name: expectation
+        description: Rule name, e.g. dq05_price_size_positive.
+      - name: passed_records
+        description: Rows that passed the rule in the update.
+      - name: failed_records
+        description: Rows that failed the rule in the update.
+      - name: last_event_ts
+        description: Last flow progress event of the update for the dataset.
