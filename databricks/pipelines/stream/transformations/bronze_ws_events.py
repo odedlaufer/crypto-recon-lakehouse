@@ -19,6 +19,7 @@ LANDING_PATH = spark.conf.get("landing_path")
     comment="One row per raw Coinbase WebSocket message (matches, heartbeat).",
     table_properties={"quality": "bronze"},
 )
+@dp.expect("dq03_no_rescued_data", "_rescued_data IS NULL")  # warn only (§6.1)
 def ws_events():
     return (
         spark.readStream.format("cloudFiles")

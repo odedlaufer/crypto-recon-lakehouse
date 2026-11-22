@@ -22,6 +22,12 @@ TRADE_COLUMNS = ["product_id", "trade_id", "price", "size", "exchange_time"]
     table_properties={"quality": "gold"},
     cluster_by=["product_id", "minute_ts"],
 )
+@dp.expect_all_or_drop(
+    {
+        "dq15_trade_ids_ordered": "first_trade_id <= last_trade_id",
+        "dq15_has_trades": "trade_count > 0",
+    }
+)
 def candles_stream_1m():
     stream = spark.read.table("silver.trades").select(*TRADE_COLUMNS)
     backfill = spark.read.table("silver.trades_backfill").select(*TRADE_COLUMNS)

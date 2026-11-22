@@ -12,3 +12,4 @@ resources:
             include: ../databricks/pipelines/stream/transformations/**
       configuration:
         landing_path: /Volumes/${var.catalog}/raw/landing
+        allowed_products: ${var.products}
