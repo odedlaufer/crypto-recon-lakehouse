@@ -82,3 +82,11 @@ jobs:
           name: capture-log-${{ github.run_id }}
           path: data/capture.log
           retention-days: 14
+
+      - name: Alert Slack on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          uv run --no-sync python -m crypto_recon_common.notify --level error \
+            "capture run failed; the chain may be broken (cron backup restarts it)"

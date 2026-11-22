@@ -110,3 +110,11 @@ jobs:
         run: |
           echo "::error::backfill reported failed gaps or uploads; see step 4"
           exit 1
+
+      - name: Alert Slack on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          uv run --no-sync python -m crypto_recon_common.notify --level error \
+            "daily-batch failed for ${{ steps.range.outputs.start }} to ${{ steps.range.outputs.end }}"
