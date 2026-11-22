@@ -36,3 +36,10 @@ each file costs upload operations and is listed again by Auto Loader.
   those become trade-id gaps, repaired from REST in Phase 3.
 - On a paid platform, a continuous pipeline and short flushes restore minute-level
   freshness (README trade-offs).
+
+## Measured effect (2026-11-22)
+`DEFAULT_STORAGE` API operations, DSU per day: 17.0 to 25.2 (average 21.3) on 2026-11-13
+to 16 with 30-second flushes; 4.10 and 4.46 on 2026-11-20 and 21 with 10-minute batches.
+About a 5x reduction, less than the estimated 19x: landing files dropped about 19x, but
+pipeline reads and Delta writes, Auto Loader listing, dbt table writes and REST files
+also count. No run has been refused since the change.

@@ -98,3 +98,36 @@ from self-chaining capture (ADR-008 amendment).
   temporarily"), caused by Volume API operations from many small files; fixed in
   ADR-011, waiting for the limit to lift. Official candles for 2026-11-16 to 2026-11-18
   to be re-run once allowed.
+
+## Phase 3: Gap detection and self-healing (passed 2026-11-22)
+Gate: CH-2 (kill the producer for 10 minutes) produces a gap that is detected and repaired
+automatically.
+
+CH-2 run 2026-11-19 (`chaos` workflow): capture cancelled 12:21:42 UTC, stopped 12:22:10,
+restarted 12:32:11. The next scheduled `daily-batch` run detected, backfilled and
+reconciled it with no manual step:
+
+| Product | Gap (trade ids) | Status | Minutes before repair → after repair |
+| --- | --- | --- | --- |
+| BTC-USD | 14,438 | repaired | 10 MISSING_IN_STREAM → MATCH; 2 PRICE_MISMATCH (edges) → MATCH |
+| ETH-USD | 1,764 | repaired | 10 MISSING_IN_STREAM → MATCH; 2 PRICE_MISMATCH (edges) → MATCH |
+| SOL-USD | 1,538 | repaired | 10 MISSING_IN_STREAM → MATCH; 2 PRICE_MISMATCH (edges) → MATCH |
+
+### State on 2026-11-22
+- `ops.gaps`: 108 repaired (1,334,852 trades), 0 open, 0 unrepairable.
+- Completeness (ADR-012 definitions):
+
+| Day | Raw | Repaired | Match rate |
+| --- | --- | --- | --- |
+| 2026-11-13 | 99.954% | 100% | 96.736% |
+| 2026-11-14 | 99.745% | 100% | 98.519% |
+| 2026-11-15 | 100% | 100% | 96.273% |
+| 2026-11-16 | 99.907% | 100% | 97.824% |
+| 2026-11-17 | 99.838% | 100% | 98.750% |
+| 2026-11-18 | 99.931% | 100% | 96.435% |
+| 2026-11-19 | 99.051% (CH-2) | 100% | 97.940% |
+| 2026-11-20 | 99.907% | 100% | 98.981% |
+| 2026-11-21 | 99.977% | 100% | 98.912% |
+
+The gap between repaired completeness and match rate is Coinbase's official candles
+disagreeing with its own trades (OFFICIAL_MISMATCH, ADR-012).
