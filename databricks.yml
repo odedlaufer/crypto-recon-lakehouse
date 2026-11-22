@@ -7,6 +7,11 @@ include:
 variables:
   catalog:
     description: Unity Catalog catalog for this target
+  products:
+    description: >-
+      Allow-list for DQ-08, comma-separated. Must equal config/products.yml
+      (tests/test_repo_config.py enforces it).
+    default: BTC-USD,ETH-USD,SOL-USD
 
 workspace:
   host: https://dbc-c6f5458b-d402.cloud.databricks.com
