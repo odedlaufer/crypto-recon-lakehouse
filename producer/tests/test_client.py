@@ -71,7 +71,7 @@ def test_handle_raw_routes_messages(tmp_path: Path) -> None:
     assert (stats.ignored, stats.server_errors) == (1, 1)
     assert _raws(_files(tmp_path, "matches")[0]) == [json.dumps(MATCH)]
     assert _raws(_files(tmp_path, "heartbeat")[0]) == [json.dumps(HEARTBEAT)]
-    assert _raws(_files(tmp_path, "_rejected")[0]) == ["garbage"]
+    assert _raws(_files(tmp_path, "rejected")[0]) == ["garbage"]
 
 
 def test_run_lands_messages_and_reconnects(tmp_path: Path) -> None:
@@ -113,7 +113,7 @@ async def _run_against_local_server(tmp_path: Path) -> None:
     trade_ids = [json.loads(raw)["trade_id"] for raw in _raws(matches_file)]
     assert trade_ids == [10, 11]
     assert len(_files(tmp_path, "heartbeat")) == 1
-    assert len(_files(tmp_path, "_rejected")) == 1
+    assert len(_files(tmp_path, "rejected")) == 1
 
 
 class FakeClock:
@@ -143,7 +143,7 @@ def test_tick_reports_heartbeat_gap_and_writes_metrics(tmp_path: Path) -> None:
     producer.tick()
     batcher.flush_all()
 
-    [metrics_file] = _files(tmp_path, "_metrics")
+    [metrics_file] = _files(tmp_path, "metrics")
     [record] = [json.loads(line) for line in metrics_file.read_text().splitlines()]
     assert record["run_id"] == producer.run_id
     assert (record["messages"], record["landed"], record["trade_gaps"]) == (3, 3, 1)

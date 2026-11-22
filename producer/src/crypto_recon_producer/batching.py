@@ -25,8 +25,8 @@ from crypto_recon_producer.messages import HeartbeatMessage, MatchMessage
 
 MATCHES_CHANNEL = "matches"
 HEARTBEAT_CHANNEL = "heartbeat"
-REJECTED_CHANNEL = "_rejected"
-METRICS_CHANNEL = "_metrics"
+REJECTED_CHANNEL = "rejected"
+METRICS_CHANNEL = "metrics"
 UNKNOWN_PRODUCT = "unknown"
 
 _UNSAFE_PATH_CHARS = re.compile(r"[^A-Za-z0-9-]")
