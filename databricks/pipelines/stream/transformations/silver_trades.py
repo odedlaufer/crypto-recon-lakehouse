@@ -70,8 +70,12 @@ def _parsed_trades() -> DataFrame:
 )
 @dp.expect_all_or_drop(TRADE_RULES)
 def trades():
+    # A future trade time would advance the watermark and make later real trades look late,
+    # so the dedupe would drop them. Remove such rows before the watermark; quarantine.trades
+    # still records them under dq07_not_in_future.
     return (
         _parsed_trades()
+        .where(f"exchange_time IS NULL OR ({TRADE_RULES['dq07_not_in_future']})")
         .withWatermark("exchange_time", "15 minutes")
         .dropDuplicatesWithinWatermark(["product_id", "trade_id"])
     )
