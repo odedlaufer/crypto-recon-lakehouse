@@ -6,12 +6,20 @@ sources:
     schema: silver
     tables:
       - name: trades
-        description: One row per Coinbase trade (stream or backfill).
+        description: One row per Coinbase trade from the stream.
         config:
           loaded_at_field: exchange_time
-          freshness:  # FR-D4
+          freshness:  # FR-D4, DQ-10
             warn_after: {count: 30, period: minute}
             error_after: {count: 2, period: hour}
+        data_tests:  # FR-O5, DQ-19: warn only; edr monitor sends anomalies to Slack
+          - elementary.dimension_anomalies:  # trades per product per day
+              arguments:
+                timestamp_column: exchange_time
+                time_bucket: {period: day, count: 1}
+                dimensions: [product_id]
+              config:
+                severity: warn
       - name: trades_backfill
         description: Trades fetched from REST to repair gaps (ADR-014).
       - name: candles_official

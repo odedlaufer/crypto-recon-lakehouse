@@ -26,3 +26,7 @@ data/
 
 # OS / editor
 .DS_Store
+
+# Elementary CLI output
+dbt/edr_target/
+dbt/edr_report.html
