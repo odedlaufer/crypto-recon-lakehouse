@@ -119,3 +119,58 @@ models:
       - name: last_reconciled_at
         data_type: timestamp
         description: Latest reconciliation of any minute in the hour.
+
+  - name: mart_market_daily
+    description: >-
+      Daily market view per product and complete UTC day (PRD §4, §7): OHLC, VWAP,
+      volume, notional, trade count and realized volatility, from every known trade
+      (stream + backfill, deduplicated). minutes_with_trades below 1,440 marks partial
+      days (for example before capture started).
+    config:
+      contract:
+        enforced: true
+    data_tests:
+      - dbt_utils.unique_combination_of_columns:
+          arguments:
+            combination_of_columns: [product_id, day]
+    columns:
+      - name: product_id
+        data_type: string
+        description: Coinbase product, e.g. BTC-USD.
+        constraints:
+          - type: not_null
+      - name: day
+        data_type: date
+        description: UTC day.
+        constraints:
+          - type: not_null
+      - name: open
+        data_type: decimal(38,18)
+        description: Price of the day's lowest trade id.
+      - name: high
+        data_type: decimal(38,18)
+        description: Highest trade price of the day.
+      - name: low
+        data_type: decimal(38,18)
+        description: Lowest trade price of the day.
+      - name: close
+        data_type: decimal(38,18)
+        description: Price of the day's highest trade id.
+      - name: vwap
+        data_type: decimal(38,8)
+        description: Volume-weighted average price, sum(price * size) / sum(size).
+      - name: volume
+        data_type: decimal(38,18)
+        description: Sum of trade sizes (base currency).
+      - name: notional_usd
+        data_type: decimal(38,8)
+        description: Sum of price * size (quote currency, USD).
+      - name: trade_count
+        data_type: bigint
+        description: Number of distinct trades.
+      - name: minutes_with_trades
+        data_type: bigint
+        description: Minutes of the day with at least one trade (1,440 at most).
+      - name: realized_vol_pct
+        data_type: double
+        description: Std dev of 1-minute log returns of candle closes x sqrt(1440) x 100.

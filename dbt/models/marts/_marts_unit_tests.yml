@@ -71,3 +71,29 @@ unit_tests:
       rows:
         - {product_id: BTC-USD, hour_ts: "2026-11-14 07:00:00", minutes: 4, complete_minutes_before: 2, complete_minutes_after: 3, match_minutes: 2, official_mismatch_minutes: 1, raw_completeness_pct: 50.0, repaired_completeness_pct: 75.0, match_rate_pct: 50.0}
         - {product_id: BTC-USD, hour_ts: "2026-11-14 08:00:00", minutes: 1, complete_minutes_before: 1, complete_minutes_after: 1, match_minutes: 1, official_mismatch_minutes: 0, raw_completeness_pct: 100.0, repaired_completeness_pct: 100.0, match_rate_pct: 100.0}
+
+  - name: market_daily_metrics
+    description: >-
+      VWAP, OHLC by trade id, dedup of a trade seen in stream and backfill, and realized
+      volatility from 1-minute closes.
+    model: mart_market_daily
+    overrides:
+      macros:
+        is_incremental: false
+      vars:
+        reconcile_start_date: "2026-11-14"
+    given:
+      - input: ref('stg_trades')
+        rows:
+          - {product_id: BTC-USD, trade_id: 1, exchange_time: "2026-11-14 00:00:10", price: 100, size: 1, source: stream}
+          - {product_id: BTC-USD, trade_id: 2, exchange_time: "2026-11-14 00:00:20", price: 110, size: 3, source: stream}
+          - {product_id: BTC-USD, trade_id: 2, exchange_time: "2026-11-14 00:00:20", price: 110, size: 3, source: backfill}
+          - {product_id: BTC-USD, trade_id: 3, exchange_time: "2026-11-14 00:01:10", price: 90, size: 1, source: backfill}
+      - input: ref('stg_candles_stream')
+        rows:
+          - {product_id: BTC-USD, minute_ts: "2026-11-14 00:00:00", close: 100}
+          - {product_id: BTC-USD, minute_ts: "2026-11-14 00:01:00", close: 110}
+          - {product_id: BTC-USD, minute_ts: "2026-11-14 00:02:00", close: 100}
+    expect:
+      rows:
+        - {product_id: BTC-USD, day: "2026-11-14", open: 100, high: 110, low: 90, close: 90, vwap: 104.0, volume: 5, notional_usd: 520, trade_count: 3, minutes_with_trades: 2}
