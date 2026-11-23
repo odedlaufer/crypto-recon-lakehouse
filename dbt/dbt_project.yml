@@ -22,6 +22,8 @@ vars:
   # days the alert checks.
   completeness_slo_pct: 99.9
   completeness_alert_days: 3
+  # mart_market_daily: incremental runs recompute this many recent days (repairs land late).
+  market_lookback_days: 3
 
 models:
   crypto_recon:

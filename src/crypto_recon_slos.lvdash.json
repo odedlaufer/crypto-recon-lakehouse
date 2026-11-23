@@ -119,6 +119,17 @@
         "GROUP BY ALL ORDER BY hour_ts;"
       ],
       "schema": "default"
+    },
+    {
+      "catalog": "crypto_dev",
+      "displayName": "market_daily",
+      "name": "6d6b7444",
+      "queryLines": [
+        "SELECT product_id, day, realized_vol_pct, trade_count, vwap\n",
+        "FROM marts.mart_market_daily\n",
+        "ORDER BY day, product_id;"
+      ],
+      "schema": "default"
     }
   ],
   "pages": [
@@ -865,6 +876,148 @@
                 "title": {
                   "fields": [],
                   "value": "Quarantined rows by rule"
+                }
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 26
+          },
+          "widget": {
+            "name": "market-volatility",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6d6b7444",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "SUM(`realized_vol_pct`)",
+                      "name": "sum(realized_vol_pct)"
+                    },
+                    {
+                      "expression": "`product_id`",
+                      "name": "product_id"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(realized_vol_pct)",
+                  "displayName": "Realized volatility %",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "product_id",
+                  "displayName": "product_id",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Daily realized volatility % (1-minute returns)"
+                }
+              },
+              "version": 3,
+              "widgetType": "line"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 6,
+            "y": 26
+          },
+          "widget": {
+            "name": "market-trades",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "6d6b7444",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "SUM(`trade_count`)",
+                      "name": "sum(trade_count)"
+                    },
+                    {
+                      "expression": "`product_id`",
+                      "name": "product_id"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(trade_count)",
+                  "displayName": "Trades",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "product_id",
+                  "displayName": "product_id",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Trades per day"
                 }
               },
               "version": 3,
