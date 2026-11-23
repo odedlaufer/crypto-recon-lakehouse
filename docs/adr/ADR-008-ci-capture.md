@@ -39,3 +39,15 @@ provide continuity.
 - The cron schedule remains as a backup that restarts a broken chain.
 - daily-batch keeps cron only: it is idempotent and re-fetches 2 days, so delays or a
   skipped day are absorbed by the next run.
+
+## Amendment 2 (2026-11-23): capture watchdog
+On 2026-11-22 both active capture runs (#67, #68) were cancelled at the same moment
+(about 21:16 UTC; "The operation was canceled", no user cancellation and no GitHub
+incident recorded). No run failed, so no failure alert fired; the 00:07 UTC cron slot
+did not run and the 05:07 slot started 2 h 15 m late, leaving a 10-hour hole (repaired
+automatically by backfill).
+
+`capture-watchdog` runs at :17 and :47 every hour. When no capture run is queued or in
+progress, and no chaos run is active, it starts a capture window and sends a Slack
+warning. Worst-case hole: about an hour (more if GitHub delays the watchdog too); the
+hole is repaired by the next daily-batch.
