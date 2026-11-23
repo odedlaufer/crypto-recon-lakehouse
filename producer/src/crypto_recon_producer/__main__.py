@@ -53,6 +53,12 @@ def _parse_args(argv: list[str] | None) -> argparse.Namespace:
         default=100_000,
         help="Flush a batch early once it holds this many messages.",
     )
+    parser.add_argument(
+        "--chaos-drop-pct",
+        type=float,
+        default=0.0,
+        help="CH-1 fault injection: drop this percentage of trades (0 to 100). Default 0.",
+    )
     parser.add_argument("--log-level", default="INFO")
     parser.add_argument(
         "--log-file",
@@ -75,7 +81,9 @@ async def _run(args: argparse.Namespace) -> None:
         max_messages=args.max_messages,
         max_age=timedelta(seconds=args.flush_seconds),
     )
-    producer = Producer(products, batcher, url=args.url)
+    if args.chaos_drop_pct:
+        logger.warning("CH-1: dropping %.1f%% of trades on purpose", args.chaos_drop_pct)
+    producer = Producer(products, batcher, url=args.url, chaos_drop_pct=args.chaos_drop_pct)
 
     stop = asyncio.Event()
     loop = asyncio.get_running_loop()

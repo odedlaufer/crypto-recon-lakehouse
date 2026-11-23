@@ -11,6 +11,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import random
 import uuid
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass
@@ -75,6 +76,7 @@ class ProducerStats:
     trade_gaps: int = 0
     heartbeat_gaps: int = 0
     files_flushed: int = 0
+    chaos_dropped: int = 0  # CH-1: trades dropped on purpose
 
 
 class Producer:
@@ -91,7 +93,11 @@ class Producer:
         tick_seconds: float = 1.0,
         metrics_interval: timedelta = timedelta(seconds=30),
         on_flush: Callable[[list[FlushedFile]], None] | None = None,
+        chaos_drop_pct: float = 0.0,
+        rng: random.Random | None = None,
     ) -> None:
+        if not 0.0 <= chaos_drop_pct <= 100.0:
+            raise ValueError("chaos_drop_pct must be between 0 and 100")
         self._products = tuple(products)
         self._batcher = batcher
         self._url = url
@@ -100,6 +106,9 @@ class Producer:
         self._tick_seconds = tick_seconds
         self._metrics_interval = metrics_interval
         self._on_flush = on_flush
+        # CH-1 (PRD §8.5): drop this share of trades as if the WebSocket lost them.
+        self._chaos_drop_pct = chaos_drop_pct
+        self._rng = rng or random.Random()  # noqa: S311 (fault injection, not security)
         self.run_id = uuid.uuid4().hex
         self.stats = ProducerStats()
         self._gaps = GapTracker(self._products)
@@ -121,6 +130,9 @@ class Producer:
             return
 
         if isinstance(message, MatchMessage):
+            if self._chaos_drop_pct and self._rng.random() * 100 < self._chaos_drop_pct:
+                self.stats.chaos_dropped += 1  # lost before anything sees it, like a real drop
+                return
             self._gaps.on_trade(message.product_id, message.trade_id)
             latency_ms = (received_at - message.time).total_seconds() * 1000
             self._window.latencies_ms.append(latency_ms)
