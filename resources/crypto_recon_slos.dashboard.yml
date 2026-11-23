@@ -1,0 +1,6 @@
+resources:
+  dashboards:
+    crypto_recon_slos:
+      display_name: "crypto-recon SLOs"
+      warehouse_id: 8330a90a8089093e
+      file_path: ../src/crypto_recon_slos.lvdash.json
