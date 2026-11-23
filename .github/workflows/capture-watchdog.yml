@@ -1,0 +1,51 @@
+name: capture-watchdog
+
+# Restarts capture when no capture run is active, and alerts Slack (ADR-008 amendment 2).
+# Runs twice an hour: GitHub delays or drops scheduled runs, so frequent slots keep the
+# worst-case capture hole to about an hour.
+
+on:
+  schedule:
+    - cron: "17,47 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write # list and start capture runs
+
+concurrency:
+  group: capture-watchdog
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      restarted: ${{ steps.watchdog.outputs.restarted }}
+      last_run: ${{ steps.watchdog.outputs.last_run }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Restart capture if nothing is running
+        id: watchdog
+        run: .github/scripts/capture_watchdog.sh
+
+  alert:
+    needs: check
+    if: needs.check.outputs.restarted == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: dev # holds SLACK_WEBHOOK_URL
+    steps:
+      - uses: actions/checkout@v6
+      - uses: astral-sh/setup-uv@v8.2.0
+      - name: Alert Slack
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          LAST_RUN: ${{ needs.check.outputs.last_run }}
+        run: |
+          uv run --frozen --package crypto-recon-common python -m crypto_recon_common.notify --level warning \
+            "capture was not running (last run ended $LAST_RUN); the watchdog started a new capture window. The hole is backfilled by the next daily-batch."
