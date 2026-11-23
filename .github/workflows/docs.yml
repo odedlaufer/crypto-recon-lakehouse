@@ -1,0 +1,102 @@
+name: docs
+
+# Publishes dbt docs and the Elementary report to GitHub Pages after each daily-batch run
+# (PRD §8.3, FR-D5, FR-O5). Site: https://odedlaufer.github.io/crypto-recon-lakehouse/
+
+on:
+  workflow_run:
+    workflows: [daily-batch]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment: dev # Databricks token for dbt docs and edr
+    timeout-minutes: 30
+    env:
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install
+        run: |
+          uv sync --frozen --all-packages --group dbt
+          cd dbt && uv run --no-sync dbt deps
+
+      - name: dbt docs (single self-contained page)
+        working-directory: dbt
+        run: uv run --no-sync dbt docs generate --static --target ci_dev
+
+      - name: Elementary report
+        working-directory: dbt
+        run: |
+          uv run --no-sync edr report --profiles-dir . --project-dir . --profile-target ci_dev \
+            --file-path edr_report.html
+
+      - name: Assemble site
+        run: |
+          mkdir -p site/dbt site/elementary
+          cp dbt/target/static_index.html site/dbt/index.html
+          cp dbt/edr_report.html site/elementary/index.html
+          generated="$(date -u '+%Y-%m-%d %H:%M UTC')"
+          cat > site/index.html <<HTML
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>crypto-recon-lakehouse docs</title>
+            <style>
+              body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
+              a { font-size: 1.15rem; }
+              li { margin: 0.75rem 0; }
+              small { color: #666; }
+            </style>
+          </head>
+          <body>
+            <h1>crypto-recon-lakehouse</h1>
+            <p>Coinbase trades captured live, reconciled against official candles, gaps repaired
+            automatically. Published after each daily run.</p>
+            <ul>
+              <li><a href="dbt/">dbt docs</a>: models, lineage, tests and contracts</li>
+              <li><a href="elementary/">Elementary report</a>: test results, anomaly detection, run history</li>
+              <li><a href="https://github.com/odedlaufer/crypto-recon-lakehouse">Source on GitHub</a></li>
+            </ul>
+            <small>Generated ${generated}</small>
+          </body>
+          </html>
+          HTML
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write # to deploy to Pages
+      id-token: write # to verify the deployment comes from this workflow
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5

@@ -77,7 +77,7 @@ jobs:
 
       - name: Upload capture log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: capture-log-${{ github.run_id }}
           path: data/capture.log
