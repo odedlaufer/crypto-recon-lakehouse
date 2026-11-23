@@ -18,6 +18,10 @@ vars:
   reconcile_lookback_days: 3
   # Gap detection (FR-J2, ADR-013) scans this many recent days of silver.trades.
   gap_lookback_days: 3
+  # PRD §2 / ADR-012: repaired completeness SLO per product-day, and how many recent
+  # days the alert checks.
+  completeness_slo_pct: 99.9
+  completeness_alert_days: 3
 
 models:
   crypto_recon:

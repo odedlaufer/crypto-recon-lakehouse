@@ -1,0 +1,13 @@
+version: 2
+
+data_tests:
+  - name: assert_repaired_completeness_slo
+    description: >-
+      Repaired completeness (MATCH + OFFICIAL_MISMATCH after gap repair) is at least
+      completeness_slo_pct (99.9%) for every product-day in the last
+      completeness_alert_days days (PRD §2, ADR-012). Rows returned are the product-days
+      below the SLO.
+  - name: assert_no_unrepairable_gaps
+    description: >-
+      No gap in trade ids is unrepairable, i.e. missing from Coinbase REST after
+      backfill (PRD §7, FR-J3). Rows returned are the unrepairable gaps.
