@@ -1,0 +1,66 @@
+# Soda data contract for the write-audit-publish gate on official candles (PRD §6.2, ADR-004).
+# Variables are set by databricks/jobs/soda_audit.py for each run.
+dataset: crypto_recon/${var.CATALOG}/silver/candles_official_staging
+
+variables:
+  CATALOG:
+  START_DATE:
+  END_DATE:
+  PRODUCTS:
+
+columns:
+  - name: product_id
+    checks:
+      - missing:
+          name: DQ-12 product_id not null
+  - name: minute_ts
+    checks:
+      - missing:
+          name: DQ-12 minute_ts not null
+  - name: open
+    checks:
+      - missing:
+          name: DQ-12 open not null
+  - name: high
+    checks:
+      - missing:
+          name: DQ-12 high not null
+  - name: low
+    checks:
+      - missing:
+          name: DQ-12 low not null
+  - name: close
+    checks:
+      - missing:
+          name: DQ-12 close not null
+  - name: volume
+    checks:
+      - missing:
+          name: DQ-12 volume not null
+      - invalid:
+          name: DQ-12 volume >= 0
+          valid_min: 0
+
+checks:
+  - failed_rows:
+      name: DQ-11 low <= open, close <= high
+      expression: low > open OR low > close OR open > high OR close > high
+  - duplicate:
+      name: DQ-14 one candle per product-minute
+      columns: ['product_id', 'minute_ts']
+  - metric:
+      name: DQ-13 product-days with fewer than 1400 candles
+      query: |
+        SELECT count(*) FROM (
+          SELECT p.product_id, d.day
+          FROM (SELECT explode(split('${var.PRODUCTS}', ',')) AS product_id) AS p
+          CROSS JOIN (
+            SELECT explode(sequence(DATE'${var.START_DATE}', DATE'${var.END_DATE}')) AS day
+          ) AS d
+          LEFT JOIN ${var.CATALOG}.silver.candles_official_staging AS s
+            ON s.product_id = p.product_id AND to_date(s.minute_ts) = d.day
+          GROUP BY p.product_id, d.day
+          HAVING count(s.minute_ts) < 1400
+        ) AS short_days
+      threshold:
+        must_be: 0
