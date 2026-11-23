@@ -131,3 +131,25 @@ reconciled it with no manual step:
 
 The gap between repaired completeness and match rate is Coinbase's official candles
 disagreeing with its own trades (OFFICIAL_MISMATCH, ADR-012).
+
+## Phase 4: Data quality and observability (passed 2026-11-23)
+Gate: CH-3 and CH-4 are caught by the right checks; every SLO shows a value on the
+dashboard.
+
+- CH-3: 7 malformed messages; each caught by its rule (DQ-01, DQ-05 to DQ-08); 0 reached
+  silver (docs/chaos.md).
+- CH-4: corrupted official candle; Soda DQ-11 failed, publish skipped, silver unchanged;
+  restore passes (docs/chaos.md).
+- Dashboard `crypto-recon SLOs` (bundle-managed): all 9 PRD §2 SLOs shown. 7-day values on
+  2026-11-23: repaired completeness 100%, raw 98.17%, match rate 98.3%, freshness at last
+  load 2.9 min, producer latency p95 171.6 ms, gap repair p95 2.46 h, quarantine 0%, batch
+  gate 100%, pipeline success 100%.
+
+Delivered in Phase 4: Slack alerts (notify helper, workflow failure alerts, Elementary
+`edr monitor`); expectations and quarantine (DQ-01, 03, 05 to 08, 15); ops tables
+(producer metrics, pipeline runs, expectation counts); WAP audit on a Soda contract
+(ADR-004); source freshness and Elementary anomaly tests; completeness-SLO and
+unrepairable-gap alerts; capture watchdog; SLO dashboard as code.
+
+Open for Phase 5: re-enable the `ci` workflow and its required `lint-test` check; market
+view panel (`mart_market_daily`); dashboard catalog override for `prd`.

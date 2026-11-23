@@ -42,6 +42,8 @@ select = ["E", "F", "W", "I", "B", "UP", "N", "S", "SIM", "RUF"]
 "databricks/**" = ["N812", "S608"]
 
 [tool.pytest.ini_options]
+# Only our tests; dbt/dbt_packages holds third-party packages with their own suites.
+testpaths = ["libs", "producer", "fetchers", "tests"]
 addopts = "-ra --strict-markers --import-mode=importlib"
 
 [tool.ruff.lint.isort]
