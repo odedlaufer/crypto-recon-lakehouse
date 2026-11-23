@@ -78,7 +78,7 @@ jobs:
 
       - name: 3. dbt build (reconcile; raw verdict)
         working-directory: dbt
-        run: uv run --no-sync dbt build --target ci_dev
+        run: uv run --no-sync dbt build --target ci_dev --exclude tag:post_repair
 
       - name: 4. Backfill open gaps from REST
         id: backfill
