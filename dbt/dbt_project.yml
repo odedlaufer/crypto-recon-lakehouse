@@ -34,3 +34,6 @@ models:
       +schema: marts
     ops:
       +schema: ops
+  # Elementary (FR-O5): artifacts, run results and anomaly metrics in their own schema.
+  elementary:
+    +schema: elementary
