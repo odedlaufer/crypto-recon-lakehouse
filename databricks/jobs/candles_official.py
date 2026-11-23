@@ -1,11 +1,11 @@
-"""Official candles: bronze -> staging -> audit -> publish (FR-J1, PRD §6.2 write-audit-publish).
+"""Official candles: bronze -> staging -> publish (FR-J1, PRD §6.2 write-audit-publish).
 
-Each step runs as its own job task, so a failed audit stops the job before `publish` and
-leaves `silver.candles_official_staging` in place for debugging.
+Each step runs as its own job task. The audit between `stage` and `publish` is the Soda
+contract in databricks/jobs/soda_audit.py (ADR-004): a failed audit stops the job before
+`publish` and leaves `silver.candles_official_staging` in place for debugging.
 
     --step load_bronze  Auto Loader (availableNow): landing/rest/candles -> bronze.candles_official
     --step stage        latest fetch per (product, minute) for the date range -> staging
-    --step audit        DQ-11 to DQ-14 on staging -> ops.dq_results; raises if any check fails
     --step publish      MERGE staging -> silver.candles_official
 """
 
@@ -13,30 +13,13 @@ from __future__ import annotations
 
 import argparse
 import re
-from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 
-import yaml
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F
 
-STEPS = ("load_bronze", "stage", "audit", "publish")
-MIN_CANDLES_PER_DAY = 1400  # DQ-13: a day has 1,440 minutes; a few may have no trades
+STEPS = ("load_bronze", "stage", "publish")
 IDENTIFIER = re.compile(r"[a-z_][a-z0-9_]*")
-
-
-@dataclass(frozen=True)
-class Check:
-    check_id: str
-    scope: str
-    passed: bool
-    observed: float
-    threshold: str
-    details: str
-
-
-class AuditFailedError(RuntimeError):
-    """At least one write-audit-publish check failed; nothing is published."""
 
 
 def _parse_args() -> argparse.Namespace:
@@ -45,8 +28,6 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--catalog", required=True)
     parser.add_argument("--start", default="", help="YYYY-MM-DD; empty means yesterday UTC")
     parser.add_argument("--end", default="", help="YYYY-MM-DD; empty means --start")
-    parser.add_argument("--products-config", required=True)
-    parser.add_argument("--run-id", default="manual")
     args = parser.parse_args()
 
     if not IDENTIFIER.fullmatch(args.catalog):
@@ -57,10 +38,6 @@ def _parse_args() -> argparse.Namespace:
     if args.start > args.end:
         parser.error(f"--start {args.start} is after --end {args.end}")
     return args
-
-
-def _days(start: date, end: date) -> list[date]:
-    return [start + timedelta(days=n) for n in range((end - start).days + 1)]
 
 
 def load_bronze(spark: SparkSession, catalog: str) -> None:
@@ -124,96 +101,6 @@ def stage(spark: SparkSession, catalog: str, start: date, end: date) -> None:
     print(f"staging: {rows} candles for {start} to {end}")
 
 
-def audit(
-    spark: SparkSession,
-    catalog: str,
-    start: date,
-    end: date,
-    products: list[str],
-    run_id: str,
-) -> None:
-    staging = f"{catalog}.silver.candles_official_staging"
-    checks: list[Check] = []
-
-    bad_ohlc = spark.sql(f"""
-        SELECT count(*) FROM {staging}
-        WHERE NOT (low <= open AND low <= close AND open <= high AND close <= high)
-    """).first()[0]
-    checks.append(
-        Check("DQ-11", "all", bad_ohlc == 0, bad_ohlc, "= 0", "rows violating low <= o,c <= high")
-    )
-
-    bad_values = spark.sql(f"""
-        SELECT count(*) FROM {staging}
-        WHERE minute_ts IS NULL OR open IS NULL OR high IS NULL OR low IS NULL
-           OR close IS NULL OR volume IS NULL OR volume < 0
-    """).first()[0]
-    checks.append(
-        Check("DQ-12", "all", bad_values == 0, bad_values, "= 0", "null/unparsable or volume < 0")
-    )
-
-    counts = {
-        (r.product_id, r.day): r.n
-        for r in spark.sql(f"""
-            SELECT product_id, to_date(minute_ts) AS day, count(*) AS n
-            FROM {staging} WHERE minute_ts IS NOT NULL GROUP BY ALL
-        """).collect()
-    }
-    for day in _days(start, end):
-        for product in products:
-            n = counts.get((product, day), 0)
-            checks.append(
-                Check(
-                    "DQ-13",
-                    f"{product} {day}",
-                    n >= MIN_CANDLES_PER_DAY,
-                    n,
-                    f">= {MIN_CANDLES_PER_DAY}",
-                    f"{1440 - n} minutes without a candle",
-                )
-            )
-
-    duplicates = spark.sql(f"""
-        SELECT count(*) - count(DISTINCT product_id, minute_ts) FROM {staging}
-    """).first()[0]
-    checks.append(
-        Check("DQ-14", "all", duplicates == 0, duplicates, "= 0", "duplicate (product, minute)")
-    )
-
-    spark.sql(f"""
-        CREATE TABLE IF NOT EXISTS {catalog}.ops.dq_results (
-          run_id STRING, checked_at TIMESTAMP, check_id STRING, table_name STRING,
-          scope STRING, passed BOOLEAN, observed_value DOUBLE, threshold STRING, details STRING
-        )
-    """)
-    checked_at = datetime.now(UTC)
-    rows = [
-        (
-            run_id,
-            checked_at,
-            c.check_id,
-            staging,
-            c.scope,
-            c.passed,
-            float(c.observed),
-            c.threshold,
-            c.details,
-        )
-        for c in checks
-    ]
-    schema = spark.table(f"{catalog}.ops.dq_results").schema
-    spark.createDataFrame(rows, schema).write.mode("append").saveAsTable(
-        f"{catalog}.ops.dq_results"
-    )
-
-    for c in checks:
-        status = "PASS" if c.passed else "FAIL"
-        print(f"{status} {c.check_id} [{c.scope}] observed={c.observed} expected {c.threshold}")
-    failed = [f"{c.check_id} [{c.scope}]" for c in checks if not c.passed]
-    if failed:
-        raise AuditFailedError(f"write-audit-publish gate failed, not publishing: {failed}")
-
-
 def publish(spark: SparkSession, catalog: str) -> None:
     target = f"{catalog}.silver.candles_official"
     spark.sql(f"""
@@ -249,10 +136,6 @@ def main() -> None:
         load_bronze(spark, args.catalog)
     elif args.step == "stage":
         stage(spark, args.catalog, args.start, args.end)
-    elif args.step == "audit":
-        with open(args.products_config, encoding="utf-8") as f:
-            products = list(yaml.safe_load(f)["products"])
-        audit(spark, args.catalog, args.start, args.end, products, args.run_id)
     else:
         publish(spark, args.catalog)
 

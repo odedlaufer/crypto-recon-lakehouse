@@ -4,7 +4,8 @@ resources:
       name: crypto-recon-candles-official-${bundle.target}
       description: >-
         Official candles write-audit-publish (FR-J1, PRD 6.2): load bronze, stage the date
-        range, audit DQ-11 to DQ-14, publish to silver.candles_official only if all pass.
+        range, audit with the Soda data contract (ADR-004), publish to
+        silver.candles_official only if every check passes.
       max_concurrent_runs: 1
       email_notifications:
         on_failure:
@@ -18,8 +19,12 @@ resources:
         - environment_key: default
           spec:
             environment_version: "3"
+        - environment_key: soda
+          spec:
+            environment_version: "3"
             dependencies:
               - pyyaml
+              - soda-sparkdf==4.31.0
       tasks:
         - task_key: load_bronze
           environment_key: default
@@ -28,7 +33,6 @@ resources:
             parameters:
               - --step=load_bronze
               - --catalog=${var.catalog}
-              - --products-config=${workspace.file_path}/config/products.yml
 
         - task_key: stage
           depends_on:
@@ -41,21 +45,21 @@ resources:
               - --catalog=${var.catalog}
               - --start={{job.parameters.start_date}}
               - --end={{job.parameters.end_date}}
-              - --products-config=${workspace.file_path}/config/products.yml
 
         - task_key: audit
           depends_on:
             - task_key: stage
-          environment_key: default
+          environment_key: soda
           spark_python_task:
-            python_file: ../databricks/jobs/candles_official.py
+            python_file: ../databricks/jobs/soda_audit.py
             parameters:
-              - --step=audit
               - --catalog=${var.catalog}
+              - --contract=${workspace.file_path}/contracts/candles_official_staging.yml
+              - --products-config=${workspace.file_path}/config/products.yml
               - --start={{job.parameters.start_date}}
               - --end={{job.parameters.end_date}}
-              - --products-config=${workspace.file_path}/config/products.yml
               - --run-id={{job.run_id}}
+              - --enforce
 
         - task_key: publish
           depends_on:
@@ -66,4 +70,3 @@ resources:
             parameters:
               - --step=publish
               - --catalog=${var.catalog}
-              - --products-config=${workspace.file_path}/config/products.yml
