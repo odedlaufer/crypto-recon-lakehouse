@@ -10,17 +10,68 @@ on:
         description: Scenario to run
         type: choice
         options:
+          - ch1-drop-messages
           - ch2-kill-producer
       outage_minutes:
         description: CH-2 only. Minutes with no capture running (1 to 60)
         required: true
         default: "10"
+      ch1_minutes:
+        description: CH-1 only. Minutes of capture with dropped trades (1 to 60)
+        required: true
+        default: "20"
+      drop_pct:
+        description: CH-1 only. Percentage of trades to drop (0.1 to 50)
+        required: true
+        default: "5"
 
 permissions:
   contents: read
   actions: write # cancel and start capture runs
 
 jobs:
+  ch1-drop-messages:
+    if: inputs.scenario == 'ch1-drop-messages'
+    runs-on: ubuntu-latest
+    environment: dev # Databricks token to upload the capture
+    timeout-minutes: 75
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      CH1_MINUTES: ${{ inputs.ch1_minutes }}
+      DROP_PCT: ${{ inputs.drop_pct }}
+    steps:
+      - name: Check inputs
+        run: |
+          if ! [[ "$CH1_MINUTES" =~ ^[0-9]+$ ]] || (( CH1_MINUTES < 1 || CH1_MINUTES > 60 )); then
+            echo "ch1_minutes must be 1 to 60"; exit 1
+          fi
+          if ! awk -v p="$DROP_PCT" 'BEGIN { exit !(p + 0 >= 0.1 && p + 0 <= 50) }'; then
+            echo "drop_pct must be 0.1 to 50"; exit 1
+          fi
+
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+
+      - name: Install producer only
+        run: uv sync --frozen --no-dev --package crypto-recon-producer
+
+      - name: CH-1 capture with dropped trades, then restart capture
+        run: chaos/ch1_drop_messages.sh
+
+      - name: Upload CH-1 producer log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ch1-log-${{ github.run_id }}
+          path: data/ch1.log
+          retention-days: 14
+
   ch2-kill-producer:
     if: inputs.scenario == 'ch2-kill-producer'
     runs-on: ubuntu-latest
