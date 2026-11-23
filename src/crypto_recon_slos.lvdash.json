@@ -1,0 +1,887 @@
+{
+  "datasets": [
+    {
+      "catalog": "crypto_dev",
+      "displayName": "slo_tiles",
+      "name": "d82aa8ad",
+      "queryLines": [
+        "WITH completeness AS (\n",
+        "  SELECT round(100 * sum(complete_minutes_after)  / sum(minutes), 3) AS repaired_completeness_pct,\n",
+        "         round(100 * sum(complete_minutes_before) / sum(minutes), 3) AS raw_completeness_pct,\n",
+        "         round(100 * sum(match_minutes)           / sum(minutes), 3) AS match_rate_pct\n",
+        "  FROM marts.mart_completeness_hourly\n",
+        "  WHERE hour_ts >= current_date() - INTERVAL 7 DAYS\n",
+        "),\n",
+        "last_load AS (\n",
+        "  SELECT max(ended_at) AS ended_at FROM ops.pipeline_runs\n",
+        "  WHERE run_type = 'pipeline' AND succeeded\n",
+        "),\n",
+        "newest_trade AS (\n",
+        "  SELECT max(exchange_time) AS exchange_time,\n",
+        "         count_if(exchange_time >= current_date() - INTERVAL 7 DAYS) AS trades_7d\n",
+        "  FROM silver.trades\n",
+        "),\n",
+        "quarantined AS (\n",
+        "  SELECT count(*) AS rows_7d FROM quarantine.trades\n",
+        "  WHERE exchange_time >= current_date() - INTERVAL 7 DAYS\n",
+        "),\n",
+        "producer AS (\n",
+        "  SELECT round(percentile(latency_p95_ms, 0.95), 1) AS latency_p95_ms FROM ops.producer_metrics\n",
+        "  WHERE window_start >= current_date() - INTERVAL 7 DAYS\n",
+        "),\n",
+        "repairs AS (\n",
+        "  SELECT round(percentile((unix_timestamp(repaired_at) - unix_timestamp(detected_at)) / 3600.0, 0.95), 2) AS gap_repair_p95_h\n",
+        "  FROM ops.gaps\n",
+        "  WHERE status = 'repaired' AND repaired_at >= current_date() - INTERVAL 7 DAYS\n",
+        "),\n",
+        "gate AS (\n",
+        "  SELECT round(100 * count_if(all_passed) / count(*), 1) AS batch_gate_pass_pct\n",
+        "  FROM (SELECT run_id, bool_and(passed) AS all_passed FROM ops.dq_results\n",
+        "        WHERE checked_at >= current_date() - INTERVAL 7 DAYS GROUP BY run_id) AS audit_runs\n",
+        "),\n",
+        "pipeline AS (\n",
+        "  SELECT round(100 * count_if(succeeded) / count(*), 1) AS pipeline_success_pct FROM ops.pipeline_runs\n",
+        "  WHERE started_at >= current_date() - INTERVAL 7 DAYS\n",
+        ")\n",
+        "SELECT c.repaired_completeness_pct, c.raw_completeness_pct, c.match_rate_pct,\n",
+        "       round((unix_timestamp(l.ended_at) - unix_timestamp(n.exchange_time)) / 60.0, 1) AS freshness_at_last_load_min,\n",
+        "       p.latency_p95_ms, r.gap_repair_p95_h,\n",
+        "       round(100 * q.rows_7d / n.trades_7d, 4) AS quarantine_rate_pct,\n",
+        "       g.batch_gate_pass_pct, pl.pipeline_success_pct\n",
+        "FROM completeness c\n",
+        "CROSS JOIN last_load l CROSS JOIN newest_trade n CROSS JOIN quarantined q\n",
+        "CROSS JOIN producer p CROSS JOIN repairs r CROSS JOIN gate g CROSS JOIN pipeline pl;"
+      ],
+      "schema": "default"
+    },
+    {
+      "catalog": "crypto_dev",
+      "displayName": "completeness_daily",
+      "name": "ea2012d6",
+      "queryLines": [
+        "SELECT to_date(hour_ts) AS day,\n",
+        "       round(100 * sum(complete_minutes_before) / sum(minutes), 3) AS raw_completeness_pct,\n",
+        "       round(100 * sum(complete_minutes_after)  / sum(minutes), 3) AS repaired_completeness_pct,\n",
+        "       round(100 * sum(match_minutes)           / sum(minutes), 3) AS match_rate_pct\n",
+        "FROM marts.mart_completeness_hourly\n",
+        "GROUP BY 1 ORDER BY 1;"
+      ],
+      "schema": "default"
+    },
+    {
+      "catalog": "crypto_dev",
+      "displayName": "status_mix_daily",
+      "name": "a6197806",
+      "queryLines": [
+        "SELECT to_date(minute_ts) AS day, status_after_repair AS status, count(*) AS minutes\n",
+        "FROM marts.fct_reconciliation_1m\n",
+        "GROUP BY ALL ORDER BY day;"
+      ],
+      "schema": "default"
+    },
+    {
+      "catalog": "crypto_dev",
+      "displayName": "gaps_daily",
+      "name": "1d78d1c5",
+      "queryLines": [
+        "SELECT to_date(gap_start_time) AS day, product_id,\n",
+        "       count(*) AS gaps, sum(missing_count) AS missing_trades,\n",
+        "       count_if(status = 'repaired') AS repaired, count_if(status = 'open') AS open_gaps,\n",
+        "       count_if(status = 'unrepairable') AS unrepairable\n",
+        "FROM ops.gaps\n",
+        "GROUP BY ALL ORDER BY day, product_id;"
+      ],
+      "schema": "default"
+    },
+    {
+      "catalog": "crypto_dev",
+      "displayName": "quarantine_by_rule",
+      "name": "fef18651",
+      "queryLines": [
+        "SELECT to_date(exchange_time) AS day, rule_failed, count(*) AS quarantined_rows\n",
+        "FROM quarantine.trades GROUP BY ALL\n",
+        "UNION ALL\n",
+        "SELECT to_date(received_at) AS day, rule_failed, count(*) AS quarantined_rows\n",
+        "FROM quarantine.ws_rejected GROUP BY ALL;"
+      ],
+      "schema": "default"
+    },
+    {
+      "catalog": "crypto_dev",
+      "displayName": "producer_health_hourly",
+      "name": "bd0ec942",
+      "queryLines": [
+        "SELECT date_trunc('HOUR', window_start) AS hour_ts,\n",
+        "       round(avg(msgs_per_sec), 1) AS msgs_per_sec,\n",
+        "       sum(reconnects) AS reconnects, sum(trade_gaps) AS trade_gaps,\n",
+        "       round(percentile(latency_p95_ms, 0.95), 1) AS latency_p95_ms\n",
+        "FROM ops.producer_metrics\n",
+        "GROUP BY ALL ORDER BY hour_ts;"
+      ],
+      "schema": "default"
+    }
+  ],
+  "pages": [
+    {
+      "displayName": "SLOs",
+      "layout": [
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 0,
+            "y": 0
+          },
+          "widget": {
+            "name": "repaired-completeness-7d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "d82aa8ad",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "SUM(`repaired_completeness_pct`)",
+                      "name": "sum(repaired_completeness_pct)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(repaired_completeness_pct)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Repaired completeness % (7d)"
+                }
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 4,
+            "y": 0
+          },
+          "widget": {
+            "name": "raw-completeness-7d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "d82aa8ad",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "SUM(`raw_completeness_pct`)",
+                      "name": "sum(raw_completeness_pct)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(raw_completeness_pct)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Raw completeness % (7d)"
+                }
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 8,
+            "y": 0
+          },
+          "widget": {
+            "name": "match-rate-7d",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "d82aa8ad",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "SUM(`match_rate_pct`)",
+                      "name": "sum(match_rate_pct)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(match_rate_pct)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Match rate % (7d)"
+                }
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 0,
+            "y": 3
+          },
+          "widget": {
+            "name": "freshness-at-load",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "d82aa8ad",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "SUM(`freshness_at_last_load_min`)",
+                      "name": "sum(freshness_at_last_load_min)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(freshness_at_last_load_min)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Freshness at last load (min)"
+                }
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 4,
+            "y": 3
+          },
+          "widget": {
+            "name": "latency-p95",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "d82aa8ad",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "SUM(`latency_p95_ms`)",
+                      "name": "sum(latency_p95_ms)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(latency_p95_ms)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Producer latency p95 (ms, 7d)"
+                }
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 8,
+            "y": 3
+          },
+          "widget": {
+            "name": "gap-repair-p95",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "d82aa8ad",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "SUM(`gap_repair_p95_h`)",
+                      "name": "sum(gap_repair_p95_h)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(gap_repair_p95_h)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Gap repair time p95 (h, 7d)"
+                }
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 0,
+            "y": 6
+          },
+          "widget": {
+            "name": "quarantine-rate",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "d82aa8ad",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "SUM(`quarantine_rate_pct`)",
+                      "name": "sum(quarantine_rate_pct)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(quarantine_rate_pct)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Quarantine rate % (7d)"
+                }
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 4,
+            "y": 6
+          },
+          "widget": {
+            "name": "batch-gate-pass",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "d82aa8ad",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "SUM(`batch_gate_pass_pct`)",
+                      "name": "sum(batch_gate_pass_pct)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(batch_gate_pass_pct)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Batch gate pass rate % (7d)"
+                }
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 3,
+            "width": 4,
+            "x": 8,
+            "y": 6
+          },
+          "widget": {
+            "name": "pipeline-success",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "d82aa8ad",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "SUM(`pipeline_success_pct`)",
+                      "name": "sum(pipeline_success_pct)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(pipeline_success_pct)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Pipeline success rate % (7d)"
+                }
+              },
+              "version": 2,
+              "widgetType": "counter"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 9
+          },
+          "widget": {
+            "name": "completeness-daily",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "ea2012d6",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "SUM(`raw_completeness_pct`)",
+                      "name": "sum(raw_completeness_pct)"
+                    },
+                    {
+                      "expression": "SUM(`repaired_completeness_pct`)",
+                      "name": "sum(repaired_completeness_pct)"
+                    },
+                    {
+                      "expression": "SUM(`match_rate_pct`)",
+                      "name": "sum(match_rate_pct)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fields": [
+                    {
+                      "fieldName": "sum(raw_completeness_pct)",
+                      "displayName": "Raw %"
+                    },
+                    {
+                      "fieldName": "sum(repaired_completeness_pct)",
+                      "displayName": "Repaired %"
+                    },
+                    {
+                      "fieldName": "sum(match_rate_pct)",
+                      "displayName": "Match rate %"
+                    }
+                  ],
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Raw vs repaired completeness per day"
+                }
+              },
+              "version": 3,
+              "widgetType": "line"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 6,
+            "y": 9
+          },
+          "widget": {
+            "name": "status-mix-daily",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "a6197806",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "SUM(`minutes`)",
+                      "name": "sum(minutes)"
+                    },
+                    {
+                      "expression": "`status`",
+                      "name": "status"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(minutes)",
+                  "displayName": "Minutes",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "status",
+                  "displayName": "status",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Reconciliation status mix per day (after repair)"
+                }
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 0,
+            "y": 15
+          },
+          "widget": {
+            "name": "gaps-daily",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "1d78d1c5",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`day`",
+                      "name": "day"
+                    },
+                    {
+                      "expression": "SUM(`missing_trades`)",
+                      "name": "sum(missing_trades)"
+                    },
+                    {
+                      "expression": "`product_id`",
+                      "name": "product_id"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "x": {
+                  "fieldName": "day",
+                  "displayName": "day",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(missing_trades)",
+                  "displayName": "Missing trades",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                },
+                "color": {
+                  "fieldName": "product_id",
+                  "displayName": "product_id",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Missing trades by gap day"
+                }
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 6,
+            "width": 6,
+            "x": 6,
+            "y": 15
+          },
+          "widget": {
+            "name": "producer-throughput",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "bd0ec942",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`hour_ts`",
+                      "name": "hour_ts"
+                    },
+                    {
+                      "expression": "SUM(`msgs_per_sec`)",
+                      "name": "sum(msgs_per_sec)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "x": {
+                  "fieldName": "hour_ts",
+                  "displayName": "hour_ts",
+                  "scale": {
+                    "type": "temporal"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(msgs_per_sec)",
+                  "displayName": "Messages per second",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Producer throughput per hour"
+                }
+              },
+              "version": 3,
+              "widgetType": "line"
+            }
+          }
+        },
+        {
+          "position": {
+            "height": 5,
+            "width": 12,
+            "x": 0,
+            "y": 21
+          },
+          "widget": {
+            "name": "quarantine-by-rule",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fef18651",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "expression": "`rule_failed`",
+                      "name": "rule_failed"
+                    },
+                    {
+                      "expression": "SUM(`quarantined_rows`)",
+                      "name": "sum(quarantined_rows)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "data": {
+                "queryName": "main_query"
+              },
+              "encodings": {
+                "x": {
+                  "fieldName": "rule_failed",
+                  "displayName": "rule_failed",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                },
+                "y": {
+                  "fieldName": "sum(quarantined_rows)",
+                  "displayName": "Rows",
+                  "scale": {
+                    "type": "quantitative"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": {
+                  "fields": [],
+                  "value": "Quarantined rows by rule"
+                }
+              },
+              "version": 3,
+              "widgetType": "bar"
+            }
+          }
+        }
+      ],
+      "layoutVersion": "GRID_V1",
+      "name": "6b71142e",
+      "pageType": "PAGE_TYPE_CANVAS"
+    }
+  ],
+  "uiSettings": {
+    "applyModeEnabled": false,
+    "theme": {
+      "widgetHeaderAlignment": "ALIGNMENT_UNSPECIFIED"
+    }
+  }
+}
