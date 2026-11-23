@@ -99,6 +99,16 @@ jobs:
         working-directory: dbt
         run: uv run --no-sync dbt source freshness --target ci_dev
 
+      - name: 8. Elementary report and anomaly alerts (FR-O5)
+        if: ${{ !cancelled() }}
+        continue-on-error: true # observability must not fail the batch
+        working-directory: dbt
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          uv run --no-sync edr monitor --profiles-dir . --project-dir . --profile-target ci_dev --slack-webhook "$SLACK_WEBHOOK_URL"
+          uv run --no-sync edr report --profiles-dir . --project-dir . --profile-target ci_dev --file-path edr_report.html
+
       - name: Upload dbt artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -108,6 +118,8 @@ jobs:
             dbt/target/run_results.json
             dbt/target/manifest.json
             dbt/target/sources.json
+            dbt/edr_report.html
+            dbt/edr_target/edr.log
             dbt/logs/dbt.log
           retention-days: 14
 

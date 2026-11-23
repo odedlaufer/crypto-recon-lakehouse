@@ -19,6 +19,7 @@ members = [
 dbt = [
     "dbt-core>=1.12.6",
     "dbt-databricks>=1.13.0",
+    "elementary-data[databricks]>=0.26.1",
 ]
 dev = [
     "pre-commit>=4.7.0",

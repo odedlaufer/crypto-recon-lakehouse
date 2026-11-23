@@ -13,6 +13,13 @@ models:
       - dbt_utils.unique_combination_of_columns:
           arguments:
             combination_of_columns: [product_id, minute_ts]
+      - elementary.dimension_anomalies:  # FR-O5: shifts in the status mix
+          arguments:
+            timestamp_column: minute_ts
+            dimensions: [status_before_repair]
+            time_bucket: {period: day, count: 1}
+          config:
+            severity: warn
     columns:
       - name: product_id
         data_type: string
