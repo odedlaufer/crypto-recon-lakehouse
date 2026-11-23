@@ -94,6 +94,11 @@ jobs:
         working-directory: dbt
         run: uv run --no-sync dbt build --target ci_dev
 
+      - name: 7. dbt source freshness (DQ-10, FR-D4)
+        if: ${{ !cancelled() }}
+        working-directory: dbt
+        run: uv run --no-sync dbt source freshness --target ci_dev
+
       - name: Upload dbt artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -102,6 +107,7 @@ jobs:
           path: |
             dbt/target/run_results.json
             dbt/target/manifest.json
+            dbt/target/sources.json
             dbt/logs/dbt.log
           retention-days: 14
 
