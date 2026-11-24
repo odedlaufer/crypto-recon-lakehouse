@@ -9,7 +9,7 @@ import pytest
 from databricks.sdk.service.sql import StatementState
 
 from crypto_recon_fetchers.__main__ import _parse_args
-from crypto_recon_fetchers.backfill import run_backfill, write_attempts_file
+from crypto_recon_fetchers.backfill import group_nearby, run_backfill, write_attempts_file
 from crypto_recon_fetchers.gaps_source import OpenGap, read_open_gaps
 from crypto_recon_fetchers.rest import BASE_URL
 from crypto_recon_fetchers.trades import TradesClient
@@ -97,7 +97,7 @@ def test_run_backfill_budget_holes_and_failures(tmp_path: Path) -> None:
     ]
     assert [g.gap_id for g in report.skipped] == ["huge"]
     assert [g.gap_id for g in report.failed] == ["fails"]
-    assert len(report.files) == 2
+    assert len(report.files) == 1  # "small" and "tiny" are nearby: fetched and written together
 
 
 def test_write_attempts_file(tmp_path: Path) -> None:
@@ -126,7 +126,7 @@ def test_backfill_args() -> None:
     args = _parse_args(["backfill", "--warehouse-id", "wh"], today)
     assert (args.catalog, args.max_gaps, args.max_trades, args.dry_run) == (
         "crypto_dev",
-        200,
+        5000,
         2_000_000,
         False,
     )
@@ -138,3 +138,44 @@ def test_backfill_requires_warehouse(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("DATABRICKS_WAREHOUSE_ID", raising=False)
     with pytest.raises(SystemExit):
         _parse_args(["backfill"], date(2026, 11, 19))
+
+
+def test_group_nearby_merges_within_span_per_product() -> None:
+    gaps = [
+        _gap("a", 100, 100),
+        _gap("c", 1050, 1052),  # 100..1052 is 953 ids: same group as "a"
+        _gap("b", 500, 501),
+        _gap("far", 5000, 5001),
+        _gap("big", 10_000, 12_000),  # larger than the span: its own group
+        _gap("eth", 101, 101, product="ETH-USD"),
+    ]
+    groups = [[g.gap_id for g in group] for group in group_nearby(gaps, max_span=1000)]
+    assert groups == [["a", "b", "c"], ["far"], ["big"], ["eth"]]
+
+
+def test_nearby_gaps_cost_one_request_and_share_a_file(tmp_path: Path) -> None:
+    requests: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(str(request.url))
+        after, limit = int(request.url.params["after"]), int(request.url.params["limit"])
+        ids = range(after - 1, after - 1 - limit, -1)
+        return httpx.Response(200, json=[{"trade_id": i, "time": "t"} for i in ids])
+
+    http = httpx.Client(transport=httpx.MockTransport(handler), base_url=BASE_URL)
+    ticks = itertools.count(step=10.0)
+    client = TradesClient(http, sleep=lambda s: None, monotonic=lambda: next(ticks))
+    gaps = [_gap("g1", 100, 101), _gap("g2", 150, 150), _gap("g3", 300, 304)]
+
+    report = run_backfill(client, gaps, tmp_path, max_trades=100, now=lambda: NOW)
+
+    assert len(requests) == 1
+    assert [(o.gap.gap_id, o.received, o.missing) for o in report.outcomes] == [
+        ("g1", 2, 0),
+        ("g2", 1, 0),
+        ("g3", 5, 0),
+    ]
+    [path] = report.files
+    lines = [json.loads(line) for line in path.read_text().splitlines()]
+    assert sorted({line["gap_id"] for line in lines}) == ["g1", "g2", "g3"]
+    assert len(lines) == 8  # only the missing ids, not the trades in between
