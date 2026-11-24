@@ -63,7 +63,7 @@ def _parse_args(argv: Sequence[str] | None, today: date) -> argparse.Namespace:
         default=os.environ.get("DATABRICKS_WAREHOUSE_ID"),
         help="SQL warehouse to read ops.gaps. Default: DATABRICKS_WAREHOUSE_ID.",
     )
-    backfill.add_argument("--max-gaps", type=int, default=200)
+    backfill.add_argument("--max-gaps", type=int, default=5000)
     backfill.add_argument(
         "--max-trades",
         type=int,

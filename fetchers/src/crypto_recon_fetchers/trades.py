@@ -98,36 +98,50 @@ def write_trades_files(
     fetched_at: datetime,
     chunk_trades: int = CHUNK_TRADES,
 ) -> list[Path]:
-    """Write the fetched trades of one gap as JSONL, in chunks, atomically.
+    """Write the fetched trades of one gap (see write_batch_files)."""
+    return write_batch_files(output_dir, [(gap_id, result)], day, fetched_at, chunk_trades)
+
+
+def write_batch_files(
+    output_dir: Path,
+    batch: list[tuple[str, RangeResult]],
+    day: date,
+    fetched_at: datetime,
+    chunk_trades: int = CHUNK_TRADES,
+) -> list[Path]:
+    """Write the fetched trades of one or more gaps of one product as JSONL, atomically.
+
+    Nearby gaps fetched together share files, so many small gaps do not become many small
+    files (ADR-011). Each line keeps its own gap_id.
 
     Layout: {output_dir}/rest/trades/dt=YYYY-MM-DD/
             trades_{product}_{from}-{to}_{fetched}_{uuid}_{part}.jsonl
     One line per trade: {"fetched_at", "product_id", "gap_id", "raw"}.
     """
-    if not result.trades:
+    rows = [(gap_id, trade) for gap_id, result in batch for trade in result.trades]
+    if not rows:
         return []
+    product = batch[0][1].range.product_id
+    low = min(result.range.from_trade_id for _, result in batch)
+    high = max(result.range.to_trade_id for _, result in batch)
     fetched = fetched_at.astimezone(UTC)
     fetched_iso = fetched.isoformat(timespec="seconds").replace("+00:00", "Z")
     directory = output_dir / "rest" / "trades" / f"dt={day:%Y-%m-%d}"
     directory.mkdir(parents=True, exist_ok=True)
-    r = result.range
-    stem = (
-        f"trades_{r.product_id}_{r.from_trade_id}-{r.to_trade_id}_"
-        f"{fetched:%Y%m%dT%H%M%SZ}_{uuid.uuid4().hex}"
-    )
+    stem = f"trades_{product}_{low}-{high}_{fetched:%Y%m%dT%H%M%SZ}_{uuid.uuid4().hex}"
 
     paths: list[Path] = []
-    for part, start in enumerate(range(0, len(result.trades), chunk_trades)):
+    for part, start in enumerate(range(0, len(rows), chunk_trades)):
         lines = [
             json.dumps(
                 {
                     "fetched_at": fetched_iso,
-                    "product_id": r.product_id,
+                    "product_id": product,
                     "gap_id": gap_id,
                     "raw": json.dumps(trade, separators=(",", ":")),
                 }
             )
-            for trade in result.trades[start : start + chunk_trades]
+            for gap_id, trade in rows[start : start + chunk_trades]
         ]
         final_path = directory / f"{stem}_{part:03d}.jsonl"
         tmp_path = directory / f"{final_path.name}.tmp"
