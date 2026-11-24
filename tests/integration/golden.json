@@ -1,0 +1,19 @@
+{
+  "official_candles_for_day": {
+    "BTC-USD": 1440,
+    "ETH-USD": 1440,
+    "SOL-USD": 1440
+  },
+  "status_mix_in_fixture_hour": {
+    "BTC-USD MATCH": 53,
+    "BTC-USD MISSING_IN_STREAM": 5,
+    "BTC-USD PRICE_MISMATCH": 2,
+    "ETH-USD MATCH": 53,
+    "ETH-USD MISSING_IN_STREAM": 5,
+    "ETH-USD PRICE_MISMATCH": 2,
+    "SOL-USD MATCH": 52,
+    "SOL-USD MISSING_IN_STREAM": 5,
+    "SOL-USD OFFICIAL_MISMATCH": 2,
+    "SOL-USD PRICE_MISMATCH": 1
+  }
+}

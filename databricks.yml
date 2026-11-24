@@ -27,6 +27,14 @@ targets:
     variables:
       catalog: crypto_dev
 
+  it:
+    # Integration test (PRD §8.4): the same resources in their own catalog, schedules paused.
+    presets:
+      pipelines_development: true
+      trigger_pause_status: PAUSED
+    variables:
+      catalog: crypto_it
+
   prd:
     mode: production
     workspace:

@@ -1,0 +1,47 @@
+name: integration-test
+
+# Replays the recorded fixture through the real pipeline in the `it` target (catalog
+# crypto_it) and checks the results (PRD §8.4). Manual: it uses Databricks compute.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: integration-test
+  cancel-in-progress: false
+
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 45
+    env:
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+      DATABRICKS_WAREHOUSE_ID: 8330a90a8089093e
+      DATABRICKS_PROFILE: "" # token from the environment, no CLI profile
+      IT_DBT_TARGET: ci_it
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: astral-sh/setup-uv@v8.2.0
+        with:
+          enable-cache: true
+
+      - uses: databricks/setup-cli@main
+        with:
+          version: 1.25.0
+
+      - name: Install
+        run: |
+          uv sync --frozen --all-packages --group dbt
+          cd dbt && uv run --no-sync dbt deps
+
+      - name: Deploy the it target
+        run: databricks bundle deploy -t it
+
+      - name: Run the integration test
+        run: tests/integration/run_it.sh
