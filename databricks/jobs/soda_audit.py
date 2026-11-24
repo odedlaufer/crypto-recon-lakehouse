@@ -86,6 +86,13 @@ def main() -> None:
 
     if not rows:
         failed.append("no check results")
+    # Created here so a fresh catalog works (the table used to come from the old SQL audit).
+    spark.sql(
+        f"""CREATE TABLE IF NOT EXISTS {args.catalog}.ops.dq_results (
+            run_id STRING, checked_at TIMESTAMP, check_id STRING, table_name STRING,
+            scope STRING, passed BOOLEAN, observed_value DOUBLE, threshold STRING,
+            details STRING)"""
+    )
     schema = spark.table(f"{args.catalog}.ops.dq_results").schema
     if rows:
         spark.createDataFrame(rows, schema).write.mode("append").saveAsTable(

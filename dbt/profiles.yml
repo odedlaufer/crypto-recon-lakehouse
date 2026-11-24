@@ -1,6 +1,22 @@
 crypto_recon:
   target: dev
   outputs:
+    it:
+      type: databricks
+      host: dbc-c6f5458b-d402.cloud.databricks.com
+      http_path: /sql/1.0/warehouses/8330a90a8089093e
+      catalog: crypto_it
+      schema: marts
+      auth_type: oauth
+      threads: 4
+    ci_it:
+      type: databricks
+      host: dbc-c6f5458b-d402.cloud.databricks.com
+      http_path: /sql/1.0/warehouses/8330a90a8089093e
+      catalog: crypto_it
+      schema: marts
+      token: "{{ env_var('DATABRICKS_TOKEN') }}"
+      threads: 4
     dev:
       type: databricks
       host: dbc-c6f5458b-d402.cloud.databricks.com
