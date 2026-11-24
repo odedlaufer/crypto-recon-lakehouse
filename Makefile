@@ -40,3 +40,7 @@ docker-build: ## Build the producer image (crypto-recon-producer:dev)
 
 dbt: ## Run dbt in dbt/, e.g. make dbt ARGS="build --select staging"
 	cd dbt && uv run --group dbt dbt $(ARGS)
+
+.PHONY: demo
+demo: ## Live demo: preflight, live failure caught, open everything (ARGS=--quick skips the failure)
+	scripts/demo.sh $(ARGS)
