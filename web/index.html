@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Crypto Recon Lakehouse · a self-healing market-data pipeline</title>
+  <meta name="description" content="Live Coinbase trades captured, reconciled against the exchange's official candles, and repaired automatically when the stream drops data. A solo data engineering project.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <div class="wrap">
+      <p class="eyebrow">Data engineering project · Oded Laufer</p>
+      <h1>A market-data pipeline that <span class="accent">heals itself</span></h1>
+      <p class="lead">
+        Live trades for BTC, ETH and SOL are captured from Coinbase, checked minute by minute
+        against the exchange's official candles, and every trade the live stream loses is found
+        and recovered automatically.
+      </p>
+      <p class="badges">
+        <span>Solo, end to end</span><span>$0 infrastructure</span><span>Live since 2026-11-10</span><span>Databricks · dbt · Python</span>
+      </p>
+      <div class="kpis">
+        <div class="kpi"><span class="kpi-value" data-kpi="repaired">…</span><span class="kpi-label">of minutes complete after repair (last 7 days)</span></div>
+        <div class="kpi"><span class="kpi-value" data-kpi="raw">…</span><span class="kpi-label">complete from the live stream alone</span></div>
+        <div class="kpi"><span class="kpi-value" data-kpi="trades">…</span><span class="kpi-label">trades in the lakehouse</span></div>
+        <div class="kpi"><span class="kpi-value" data-kpi="recovered">…</span><span class="kpi-label">lost trades recovered automatically</span></div>
+      </div>
+      <p class="live"><span class="dot"></span> Live numbers, refreshed after every daily run · <span id="generated">loading…</span></p>
+      <nav class="cta">
+        <a class="btn primary" href="https://github.com/odedlaufer/crypto-recon-lakehouse">View the code</a>
+        <a class="btn" id="demoButton" href="#demo" hidden>Watch the 2-minute demo</a>
+        <a class="btn" href="https://linkedin.com/in/oded-laufer">LinkedIn</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section id="demo" hidden>
+      <h2>See it in two minutes</h2>
+      <video controls preload="metadata" src="media/demo.mp4"></video>
+    </section>
+
+    <section>
+      <h2>Live market feeds lose data, and most pipelines never notice</h2>
+      <div class="problem">
+        <p>Coinbase's own documentation warns that messages on its live trade channel can be dropped,
+          and that consumers must detect the gaps and backfill them. Most pipelines simply store
+          whatever arrives, so a dashboard built on them is quietly wrong.</p>
+        <p>This project <strong>proves</strong> the stored data is complete: it checks every minute against an
+          independent source, finds every missing trade by its id, and repairs the data, keeping a record
+          of both the before and the after.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Every lost trade is found and repaired by the next morning</h2>
+      <div class="chart-card">
+        <h3>Each day ends complete, even when the live stream doesn't</h3>
+        <p class="chart-sub">Share of minutes that are complete, per day. Raw = live stream only; repaired = after the automatic backfill.</p>
+        <canvas id="completenessChart" aria-label="Raw vs repaired completeness per day"></canvas>
+        <p class="note">Capture began on 2026-11-10 at 12:53 UTC, so the chart starts with the first full day.</p>
+      </div>
+      <div class="grid-2">
+        <div class="chart-card">
+          <h3>Big losses come from outages, and all of them were recovered</h3>
+          <p class="chart-sub">Missing trades detected per day.</p>
+          <canvas id="gapsChart" aria-label="Missing trades per day"></canvas>
+        </div>
+        <div class="chart-card">
+          <h3>Coinbase's own candles disagree with its trade feed on about 2% of minutes</h3>
+          <p class="chart-sub">Minutes where the stream provably had every trade but the official candle differed.</p>
+          <canvas id="officialChart" aria-label="Official candle errors per day"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>How it works: capture, refine, reconcile, detect, repair</h2>
+      <div class="flow">
+        <div class="step"><span class="num">1</span><h3>Capture</h3><p>A Python producer streams every trade from Coinbase's WebSocket, validates it and lands batches in Databricks. A watchdog restarts capture if it ever stops.</p></div>
+        <div class="step"><span class="num">2</span><h3>Refine</h3><p>A Lakeflow pipeline builds bronze, silver and gold tables: deduplicated trades, data-quality rules with a quarantine, and 1-minute candles.</p></div>
+        <div class="step"><span class="num">3</span><h3>Reconcile</h3><p>dbt compares every minute with Coinbase's official candles, which must pass a Soda write-audit-publish gate first.</p></div>
+        <div class="step"><span class="num">4</span><h3>Detect</h3><p>Trade ids are consecutive per product, so any jump is a provable gap, down to a single missing trade.</p></div>
+        <div class="step accent-step"><span class="num">5</span><h3>Repair</h3><p>Each gap's exact ids are fetched from the REST API and loaded, and the affected minutes are reconciled again.</p></div>
+        <div class="step"><span class="num">6</span><h3>Observe</h3><p>SLOs, anomaly detection and Slack alerts. This page and the dashboard update after every daily run.</p></div>
+      </div>
+      <div class="diagram"><pre class="mermaid">
+flowchart LR
+  WS[Coinbase WebSocket] --> P[Producer<br/>GitHub Actions]
+  P --> V[(Landing Volume)]
+  V --> B[Bronze] --> S[Silver trades] --> G[Gold 1-min candles]
+  REST1[Coinbase REST candles] --> W{Soda gate} --> O[Official candles]
+  G --> R[dbt reconciliation]
+  O --> R
+  S --> D[Gap detector]
+  D --> BF[REST backfill<br/>exact trade ids]
+  BF --> S
+  R --> M[Completeness marts<br/>SLOs · alerts · this site]
+      </pre></div>
+    </section>
+
+    <section>
+      <h2>Proven by breaking it on purpose</h2>
+      <p class="section-lead">Every failure mode is injected for real on the live system, and must be caught by the right check.</p>
+      <div class="chaos">
+        <article><span class="tag">CH-1</span><h3>Drop 5% of trades</h3><p>899 trades dropped at random over 20 minutes: 853 gaps.</p><p class="result">All detected and repaired within a day. It also exposed a backfill limit, now fixed: nearby gaps are fetched together.</p></article>
+        <article><span class="tag">CH-2</span><h3>Kill the producer</h3><p>Capture stopped for 10 minutes: 17,740 trades never seen.</p><p class="result">Detected and recovered the next morning, with no one involved.</p></article>
+        <article><span class="tag">CH-3</span><h3>Poison the stream</h3><p>Negative prices, bad sides, future timestamps, unknown products, broken JSON.</p><p class="result">All 7 quarantined by the exact rule; none reached the tables.</p></article>
+        <article><span class="tag">CH-4</span><h3>Corrupt the source of truth</h3><p>An official candle with its high below its low.</p><p class="result">Quality gate failed, publishing blocked, published data untouched.</p></article>
+      </div>
+      <div class="integration">
+        <h3>And an end-to-end integration test</h3>
+        <p>One recorded hour of real trades with three known gaps is replayed through the real pipeline in its own
+          catalog. It must find exactly those gaps and reproduce the exact same result every run.</p>
+      </div>
+      <h3 class="subhead">Reliability targets, last 7 days</h3>
+      <div class="slos" id="slos"></div>
+      <p class="note">Batch gate: a failed audit means a blocked publish, as designed. The CH-4 chaos test on 2026-11-23 counts here until it leaves the 7-day window.</p>
+    </section>
+
+    <section>
+      <h2>Decisions and trade-offs</h2>
+      <p class="section-lead">The constraint was a free platform with no always-on compute. Each decision is recorded as an ADR in the repository.</p>
+      <div class="decisions">
+        <article>
+          <h3>Capture runs outside Databricks</h3>
+          <p><b>Constraint</b> The free tier allows no outbound internet and no always-on compute.</p>
+          <p><b>Decision</b> A containerised producer on GitHub Actions lands files in a Unity Catalog volume, with a watchdog for restarts.</p>
+          <p><b>Trade-off</b> Scheduled runs can start late; the gap repair absorbs it.</p>
+        </article>
+        <article>
+          <h3>Batch files to fit the quota</h3>
+          <p><b>Problem</b> Writing a file every 30 seconds exhausted the daily quota.</p>
+          <p><b>Decision</b> 10-minute batches and one load per day.</p>
+          <p><b>Result</b> About 5× fewer storage API calls; freshness is now measured at load.</p>
+        </article>
+        <article>
+          <h3>Detect gaps by trade id, not by comparing candles</h3>
+          <p><b>Options</b> Compare candles only, or use trade-id continuity.</p>
+          <p><b>Decision</b> Trade ids, after measuring that they are consecutive per product.</p>
+          <p><b>Result</b> Finds gaps as small as one trade, including ones that stay within candle tolerances.</p>
+        </article>
+        <article>
+          <h3>Don't trust the "source of truth" blindly</h3>
+          <p><b>Finding</b> Official candles sometimes miss trades the exchange itself reported.</p>
+          <p><b>Decision</b> A separate status for official errors, counted honestly rather than hidden.</p>
+        </article>
+        <article>
+          <h3>A contract-based quality gate</h3>
+          <p><b>Options</b> Soda Core or Great Expectations for the write-audit-publish gate.</p>
+          <p><b>Decision</b> Soda data contracts on Spark; the licence (source-available, not OSI) is documented.</p>
+        </article>
+        <article class="paid">
+          <h3>With a paid platform, I would</h3>
+          <ul>
+            <li>stream through Kafka or Kinesis instead of landing files</li>
+            <li>run the pipeline continuously for second-level freshness</li>
+            <li>host capture on a managed container service with health checks</li>
+            <li>split dev and prod workspaces with service principals</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>What building it revealed</h2>
+      <div class="findings">
+        <article><h3>The exchange's own candles are sometimes wrong</h3><p>On about 2% of minutes, Coinbase's official candles miss trades that its own trade feed proves happened.</p></article>
+        <article><h3>Small gaps hide inside tolerances</h3><p>A two-trade gap moved a minute's volume by 0.001%, inside the match tolerance. Only trade-id continuity caught it.</p></article>
+        <article><h3>One bad timestamp can drop good data</h3><p>A trade stamped in the future would have pushed the deduplication watermark ahead and discarded real trades. Found while designing a chaos test, fixed before it happened.</p></article>
+        <article><h3>Fresh environments expose hidden assumptions</h3><p>The first integration-test run found that the quality gate relied on a table that only existed in development.</p></article>
+      </div>
+    </section>
+
+    <section>
+      <h2>See it yourself</h2>
+      <nav class="resources">
+        <a href="https://github.com/odedlaufer/crypto-recon-lakehouse"><b>Code and README</b><span>Pipeline, tests, chaos scripts, CI</span></a>
+        <a href="https://github.com/odedlaufer/crypto-recon-lakehouse/tree/main/docs/adr"><b>Decision records</b><span>Every ADR, including what didn't work</span></a>
+        <a href="dbt/"><b>dbt docs and lineage</b><span>Every model, test and contract</span></a>
+        <a href="elementary/"><b>Data-quality report</b><span>Test results and anomaly detection</span></a>
+      </nav>
+      <div class="chart-card market">
+        <h3>Market context: daily realized volatility from 1-minute returns</h3>
+        <canvas id="volChart" aria-label="Daily realized volatility per product"></canvas>
+      </div>
+      <ul class="stack">
+        <li>Databricks Free Edition</li><li>Lakeflow Declarative Pipelines</li><li>Delta Lake · Unity Catalog</li>
+        <li>dbt Core</li><li>Soda data contracts</li><li>Elementary</li><li>AI/BI dashboards</li>
+        <li>Python · uv · pydantic</li><li>GitHub Actions</li><li>Databricks Asset Bundles</li><li>Slack alerts</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="wrap">
+    <p>Built by Oded Laufer ·
+      <a href="https://linkedin.com/in/oded-laufer">LinkedIn</a> ·
+      <a href="https://github.com/odedlaufer/crypto-recon-lakehouse">GitHub</a></p>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
