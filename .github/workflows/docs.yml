@@ -46,39 +46,18 @@ jobs:
           uv run --no-sync edr report --profiles-dir . --project-dir . --profile-target ci_dev \
             --file-path edr_report.html
 
+      - name: Export live numbers for the site
+        env:
+          DATABRICKS_WAREHOUSE_ID: 8330a90a8089093e
+        run: uv run --no-sync python scripts/export_site_data.py --out site/data
+
       - name: Assemble site
         run: |
           mkdir -p site/dbt site/elementary
+          cp -r web/. site/
           cp dbt/target/static_index.html site/dbt/index.html
           cp dbt/edr_report.html site/elementary/index.html
-          generated="$(date -u '+%Y-%m-%d %H:%M UTC')"
-          cat > site/index.html <<HTML
-          <!doctype html>
-          <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>crypto-recon-lakehouse docs</title>
-            <style>
-              body { font-family: system-ui, sans-serif; max-width: 42rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.5; }
-              a { font-size: 1.15rem; }
-              li { margin: 0.75rem 0; }
-              small { color: #666; }
-            </style>
-          </head>
-          <body>
-            <h1>crypto-recon-lakehouse</h1>
-            <p>Coinbase trades captured live, reconciled against official candles, gaps repaired
-            automatically. Published after each daily run.</p>
-            <ul>
-              <li><a href="dbt/">dbt docs</a>: models, lineage, tests and contracts</li>
-              <li><a href="elementary/">Elementary report</a>: test results, anomaly detection, run history</li>
-              <li><a href="https://github.com/odedlaufer/crypto-recon-lakehouse">Source on GitHub</a></li>
-            </ul>
-            <small>Generated ${generated}</small>
-          </body>
-          </html>
-          HTML
+          ls -R site | head -30
 
       - uses: actions/configure-pages@v6
 

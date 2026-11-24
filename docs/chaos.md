@@ -39,3 +39,16 @@ CH-1, CH-3 and CH-4 are added in Phases 4 and 5.
   high 64118.86 > low 64061.05); after restore 11/11 checks passed, publish 0 changes.
 - Finding: serverless auto-optimization retried the failed audit 3 times; the audit task
   now sets `disable_auto_optimization: true` (a failed gate is deterministic).
+
+## CH-1: drop a share of trades
+- Run: `chaos` workflow, scenario `ch1-drop-messages` (`ch1_minutes`, `drop_pct`). Stops the regular
+  capture, captures with the producer's `--chaos-drop-pct`, restarts capture.
+- Expected outcome: the dropped trades become trade-id gaps in `ops.gaps` and are repaired by the
+  next daily-batch runs.
+- Result 2026-11-23 12:04:25 to 12:24:28 UTC, 5%: 899 trades dropped; 853 gaps with 1,105 missing
+  ids detected (the drops plus the two capture switch-overs). The producer's own `trade_gaps` stayed
+  low by design (it only sees tail gaps, FR-P5); interior gaps are found by `ops.gaps`.
+- Finding: the first repair run fixed only 194 gaps. The backfill read at most 200 open gaps per run
+  and spent one REST request and one file per gap. Fixed: nearby gaps of a product are fetched as one
+  id range and share files; cap raised to 5,000. The next run repaired all of them (975 repaired, 0
+  open overall), within about 22 hours of the test.

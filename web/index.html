@@ -104,7 +104,7 @@ flowchart LR
       <h2>Proven by breaking it on purpose</h2>
       <p class="section-lead">Every failure mode is injected for real on the live system, and must be caught by the right check.</p>
       <div class="chaos">
-        <article><span class="tag">CH-1</span><h3>Drop 5% of trades</h3><p>899 trades dropped at random over 20 minutes.</p><p class="result" id="ch1Result">Every hole detected by trade id and backfilled.</p></article>
+        <article><span class="tag">CH-1</span><h3>Drop 5% of trades</h3><p>899 trades dropped at random over 20 minutes: 853 gaps.</p><p class="result">All detected and repaired within a day. It also exposed a backfill limit, now fixed: nearby gaps are fetched together.</p></article>
         <article><span class="tag">CH-2</span><h3>Kill the producer</h3><p>Capture stopped for 10 minutes: 17,740 trades never seen.</p><p class="result">Detected and recovered the next morning, with no one involved.</p></article>
         <article><span class="tag">CH-3</span><h3>Poison the stream</h3><p>Negative prices, bad sides, future timestamps, unknown products, broken JSON.</p><p class="result">All 7 quarantined by the exact rule; none reached the tables.</p></article>
         <article><span class="tag">CH-4</span><h3>Corrupt the source of truth</h3><p>An official candle with its high below its low.</p><p class="result">Quality gate failed, publishing blocked, published data untouched.</p></article>
