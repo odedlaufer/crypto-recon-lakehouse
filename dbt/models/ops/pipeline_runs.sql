@@ -45,6 +45,9 @@ job_runs as (
         max_by(t.result_state, t.period_end_time) as status
     from {{ source('system_lakeflow', 'job_run_timeline') }} as t
     left join job_names as n on t.job_id = n.job_id
+    -- Only this target's jobs: the system tables cover every job in the workspace,
+    -- including the integration-test (it) target's.
+    where n.job_name like 'crypto-recon-%-{{ var("bundle_target") }}'
     group by t.run_id, t.job_id, n.job_name
 )
 
