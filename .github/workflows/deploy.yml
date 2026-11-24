@@ -1,0 +1,39 @@
+name: deploy
+
+# Continuous deployment (PRD §8.3, ADR-015): every merge to main deploys the bundle to dev,
+# the live environment. prd is validated so it stays deployable, but not deployed or run
+# (Free Edition quota). Destructive changes are not auto-approved: such a deploy fails and
+# needs a manual `make deploy`.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: dev
+    timeout-minutes: 20
+    env:
+      DATABRICKS_HOST: ${{ vars.DATABRICKS_HOST }}
+      DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: databricks/setup-cli@main
+        with:
+          version: 1.25.0
+
+      - name: Validate prd (must stay deployable)
+        run: databricks bundle validate -t prd
+
+      - name: Deploy dev
+        run: databricks bundle deploy -t dev
