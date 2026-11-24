@@ -24,10 +24,18 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --all-packages --frozen
+        run: uv sync --all-packages --frozen --group dbt
 
       - name: Lint (pre-commit hooks)
         run: uv run pre-commit run --all-files --show-diff-on-failure
 
       - name: Test
         run: uv run pytest
+
+      - name: dbt parse (models, tests, contracts; no warehouse needed)
+        working-directory: dbt
+        env:
+          DATABRICKS_TOKEN: not-used-by-parse
+        run: |
+          uv run --no-sync dbt deps
+          uv run --no-sync dbt parse --target ci_dev
