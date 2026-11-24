@@ -1,0 +1,47 @@
+{
+  "day": "2026-11-21",
+  "hour": 10,
+  "removed": {
+    "BTC-USD": [
+      1141453577,
+      1141453578,
+      1141453579,
+      1141453580,
+      1141453581
+    ],
+    "ETH-USD": [
+      857257492,
+      857257493,
+      857257494
+    ],
+    "SOL-USD": [
+      362177951,
+      362177952
+    ]
+  },
+  "trades": {
+    "BTC-USD": 34375,
+    "ETH-USD": 7132,
+    "SOL-USD": 4800
+  },
+  "gaps": [
+    {
+      "product_id": "BTC-USD",
+      "from_trade_id": 1141453577,
+      "to_trade_id": 1141453581,
+      "missing_count": 5
+    },
+    {
+      "product_id": "ETH-USD",
+      "from_trade_id": 857257492,
+      "to_trade_id": 857257494,
+      "missing_count": 3
+    },
+    {
+      "product_id": "SOL-USD",
+      "from_trade_id": 362177951,
+      "to_trade_id": 362177952,
+      "missing_count": 2
+    }
+  ]
+}
