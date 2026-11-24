@@ -21,6 +21,9 @@ dbt = [
     "dbt-databricks>=1.13.0",
     "elementary-data[databricks]>=0.26.1",
 ]
+demo = [
+    "playwright>=1.65.2",
+]
 dev = [
     "pre-commit>=4.7.0",
     "pytest>=9.2.0",

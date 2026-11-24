@@ -44,3 +44,7 @@ dbt: ## Run dbt in dbt/, e.g. make dbt ARGS="build --select staging"
 .PHONY: demo
 demo: ## Live demo: preflight, live failure caught, open everything (ARGS=--quick skips the failure)
 	scripts/demo.sh $(ARGS)
+
+.PHONY: demo-video
+demo-video: ## Record the captioned demo video to web/media/demo.mp4 (ARGS=--url ... for a local preview)
+	uv run --group demo python scripts/record_demo.py $(ARGS)
