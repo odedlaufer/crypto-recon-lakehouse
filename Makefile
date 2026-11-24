@@ -48,3 +48,7 @@ demo: ## Live demo: preflight, live failure caught, open everything (ARGS=--quic
 .PHONY: demo-video
 demo-video: ## Record the captioned demo video to web/media/demo.mp4 (ARGS=--url ... for a local preview)
 	uv run --group demo python scripts/record_demo.py $(ARGS)
+
+.PHONY: screenshots
+screenshots: ## Capture README screenshots of the public pages into docs/img/
+	uv run --group demo python scripts/screenshot_site.py $(ARGS)

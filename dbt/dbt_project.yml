@@ -24,6 +24,8 @@ vars:
   completeness_alert_days: 3
   # mart_market_daily: incremental runs recompute this many recent days (repairs land late).
   market_lookback_days: 3
+  # ops.pipeline_runs: count only jobs named crypto-recon-*-<bundle_target>.
+  bundle_target: dev
 
 models:
   crypto_recon:
